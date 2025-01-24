@@ -32,7 +32,48 @@ def global_alignment(sequence1, sequence2):
             matrix[i,j] = max(top_left, top, left)
     print(matrix)
     
+    # traceback
+    i = len(sequence1)
+    j = len(sequence2)
+    
+    aligned1 = ""
+    aligned2 = ""
+    score = 0
+    while i > 0 or j > 0:
+        if i > 0 and j > 0:
+            if sequence1[i-1] == sequence2[j-1]:
+                isMatch = 1
+            else:
+                isMatch = -1
+                
+            if matrix[i, j] == matrix[i-1, j-1] + isMatch:
+                score += isMatch
+                aligned1 = sequence1[i-1] + aligned1
+                aligned2 = sequence2[j-1] + aligned2
+                i -= 1
+                j -= 1
+                continue # used diagonal, so no need to check up or down
+            
 
+        if i > 0:
+            if matrix[i, j] == matrix[i-1, j] + (-1):
+                score -= 1
+                aligned1 = sequence1[i-1] + aligned1
+                aligned2 = '-' + aligned2
+                i -= 1
+                continue
+
+        if j > 0:
+            if matrix[i, j] == matrix[i, j-1] + (-1):
+                score -= 1
+                aligned1 = '-' + aligned1
+                aligned2 = sequence2[j-1] + aligned2
+                j -= 1
+                continue
+    
+    print(aligned1)
+    print(aligned2)
+    print(score)
 
 
 '''
@@ -65,11 +106,11 @@ def mutate(s, snp_rate, indel_rate):
 # creating related sequences
 s1 = random_sequence(5)
 s2 = mutate(s1, 0.1, 0.1)
-print(len(s2))
-for c in s1:
+
+for c in s2:
     print(" ", c, end="")
 print()
-for c in s2:
+for c in s1:
     print(c)
 
 # running your alignment code
