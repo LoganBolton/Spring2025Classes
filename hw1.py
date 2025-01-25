@@ -33,12 +33,14 @@ def global_alignment(sequence1, sequence2):
     print(matrix)
     
     # traceback
+    
+    # start from bottom right
     i = len(sequence1)
     j = len(sequence2)
-    
     aligned1 = ""
     aligned2 = ""
     score = 0
+    
     while i > 0 or j > 0:
         if i > 0 and j > 0:
             if sequence1[i-1] == sequence2[j-1]:
@@ -104,7 +106,7 @@ def mutate(s, snp_rate, indel_rate):
     return("".join(x))
 
 # creating related sequences
-s1 = random_sequence(5)
+s1 = random_sequence(100)
 s2 = mutate(s1, 0.1, 0.1)
 
 for c in s2:
