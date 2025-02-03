@@ -5,7 +5,7 @@ output: html_document
 
 # Data Loading and Initial Exploration
 
-```{r}
+```{r Load Data}
 # Load required libraries
 library(igraph)
 
@@ -17,7 +17,7 @@ target <- read.csv("git_web_ml/musae_git_target.csv")
 
 
 ## Edges Exploration
-```{r}
+```{r Edges}
 names(edges)
 sapply(edges, class)
 head(edges)
@@ -35,7 +35,7 @@ plot(edges$id_1)
 ```
 
 ## Features Exploration
-```{r}
+```{r Features}
 head(names(features), n = 10)
 head(sapply(features, class), n =10)
 head(features)
@@ -61,7 +61,7 @@ plot(all_features)
 ```
 
 ## Target Exploration
-```{r}
+```{r Targets}
 head(names(target), n = 10)
 head(sapply(target, class), n =10)
 head(target)
@@ -88,40 +88,40 @@ plot(target$ml_target)
 
 
 # Plot Nodes
-```{r}
+```{r Plot Whole Graph}
 
-# # Create graph from edges
-# g <- graph_from_data_frame(edges, directed = FALSE)
-# 
-# # Simple plot
-# plot(g,
-#      vertex.size = 1,          # Node size
-#      vertex.label = NA,        # Hide node labels
-#      vertex.color = "skyblue", # Node color
-#      edge.color = "gray90",    # Edge color
-#      layout = layout_with_fr)  # Fruchterman-Reingold layout
+# Create graph from edges
+g <- graph_from_data_frame(edges, directed = FALSE)
+
+# Simple plot
+plot(g,
+     vertex.size = 1,          # Node size
+     vertex.label = NA,        # Hide node labels
+     vertex.color = "skyblue", # Node color
+     edge.color = "gray90",    # Edge color
+     layout = layout_with_fr)  # Fruchterman-Reingold layout
 ```
 
 ``` {r}
-# # Identify key nodes (e.g., high-degree hubs)
-# deg <- degree(g)
-# top_nodes <- names(sort(deg, decreasing = TRUE)[1:5])  # Top 5 nodes
-# 
-# # Create ego networks around these hubs
-# subg <- make_ego_graph(g, order = 1, nodes = top_nodes) %>%
-#   do.call(what = union)
-# 
-# # Plot focused subnetwork
-# plot(subg,
-#      vertex.size = 1,
-#      vertex.label = NA,
-#      vertex.color = adjustcolor("purple", alpha = 0.3),
-#      edge.alpha = 0.05,
-#      layout = layout_with_drl)
+# Identify key nodes (e.g., high-degree hubs)
+deg <- degree(g)
+top_nodes <- names(sort(deg, decreasing = TRUE)[1:5])  # Top 5 nodes
+
+# Create ego networks around these hubs
+subg <- make_ego_graph(g, order = 1, nodes = top_nodes) %>%
+  do.call(what = union)
+
+# Plot focused subnetwork
+plot(subg,
+     vertex.size = 1,
+     vertex.label = NA,
+     vertex.color = adjustcolor("purple", alpha = 0.3),
+     edge.alpha = 0.05,
+     layout = layout_with_drl)
 ```
 
 # Visualize the data and find the following parameter associated with the graph.
-```{r}
+```{r Degree Sequences}
 
 # Create graph from edges
 g <- graph_from_data_frame(edges, directed = FALSE)
@@ -146,7 +146,10 @@ hist(degree_sequence,
      breaks = "FD", # Freedman-Diaconis rule for optimal bin width
      xlim = c(min(degree_sequence), max(degree_sequence)),
      log = "x") # Key: Set the x-axis to logarithmic scale
+```
 
+```{r Ego Network}
+g <- graph_from_data_frame(edges, directed = FALSE)
 
 max_degree <- max(degree(g))
 cat("Maximum degree of the graph:", max_degree, "\n")
@@ -162,7 +165,7 @@ ego_network <- make_ego_graph(g, order = 1, nodes = max_degree_node)[[1]]
 
 # Plot the ego network
 plot(ego_network,
-     vertex.size = 5,
+     vertex.size = 2,
      vertex.label = NA,
      vertex.color = "skyblue",
      edge.color = "gray90",
@@ -177,10 +180,11 @@ cat("Vertex connectivity of the graph:", vertex_connectivity, "\n")
 edge_connectivity <- edge_connectivity(g)
 cat("Edge connectivity of the graph:", edge_connectivity, "\n")
 
-# Minimum cutset (vertex cutset)
-min_cutset <- min_cut(g, value.only = FALSE)
-cat("Minimum vertex cutset:", min_cutset$cut, "\n")
+# Minimum cutset 
+cutset <- articulation.points(g)
+cat("Minimum cutset:", cutset[1], "\n")
 
 # Minimum edge cutset
-min_edge_cutset <- min_cut(g, value.only = FALSE, capacity = NULL)
-cat("Minimum edge cutset:", min_edge_cutset$cut, "\n")
+min_edge_cutset <- min_cut(g, value.only = TRUE)  # Just get the numeric value
+cat("Minimum edge cutset value:", min_edge_cutset, "\n")
+```
