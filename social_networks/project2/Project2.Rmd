@@ -73,14 +73,69 @@ xlab = " Out - Degree " , ylab = " Frequency " , col = " lightgreen " )
 ```
 
 ## PageRank
-
+```{r PageRank}
+page_rank <- page_rank (g , weights = E ( g ) $weight , directed = TRUE ) $vector
+```
 ## Hub and Authority Scores
-
+_Note:_ The depreciation warning about 'hub_score' and 'authority_score' appears to not actually be true.
+``` {r}
+hub_scores <- hub_score(g , scale = TRUE ) $vector # Hub scores
+auth_scores <- authority_score(g , scale = TRUE ) $vector # Authority scores
+```
 ## Closeness Centrality
+``` {r}
+harmonic_close <- harmonic_centrality (g , weights = E ( g ) $weight , mode = "out" )
+
+```
 
 ## Betweenness Centrality 
+``` {r}
+betweenness <- betweenness (g , weights = E ( g ) $weight , directed = TRUE , normalized = TRUE )
+
+```
 
 # Nodes
+``` {r}
+get_top_10 <- function (metric, metric_name) {
+  top_indices <- order ( metric , decreasing = TRUE )[1:10]
+  data.frame (
+  Metric = rep(metric_name, 10) ,
+  Node = top_indices ,
+  Value = round ( metric [ top_indices ] , 4)
+  )
+}
+
+top_nodes <- rbind (
+  get_top_10 ( in_deg , " In - Degree " ) ,
+  get_top_10 ( out_deg , " Out - Degree " ) ,
+  get_top_10 ( page_rank , " PageRank " ) ,
+  get_top_10 ( harmonic_close , " Harmonic Closeness " ) ,
+  get_top_10 ( betweenness , " Betweenness " ) ,
+  get_top_10 ( hub_scores, " Hub Scores ") ,
+  get_top_10 ( auth_scores, " Authority Scores ")
+)
+# Print results
+print ( " Top 10 nodes by different centrality measures : " )
+print ( top_nodes )
+```
+```{r}
+node_freq <- table(top_nodes$Node)
+
+# Convert to dataframe and sort
+node_freq_df <- data.frame(
+  Node = names(node_freq),
+  Frequency = as.numeric(node_freq)
+)
+node_freq_df <- node_freq_df[order(-node_freq_df$Frequency), ]
+
+# Create the plot using base R
+barplot(node_freq_df$Frequency[1:10], 
+        names.arg = node_freq_df$Node[1:10],
+        main = "Top 10 Most Frequent Nodes",
+        xlab = "Node ID",
+        ylab = "Frequency",
+        las = 2)  # Rotate x-axis labels
+```
 
 # Justification
 
