@@ -1,0 +1,44 @@
+---
+title: "Project 2"
+author: "Logan Bolton"
+output: pdf_document
+date: "2025-02-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("/Users/log/Github/Spring2025Classes/social_networks/project2")
+D <- read.csv("congress_network/congress.edgelist")
+```
+
+
+```{r}
+print("Data structure:")
+str(D)
+print("First few rows:") 
+head(D)
+
+# Load the library
+library(igraph) 
+library(stringr)
+```
+
+```{r}
+
+
+# Format the data
+edges_df <- data.frame(
+  from = as.numeric(sub("^(\\d+).*", "\\1", D$X0.4...weight...0.002105263157894737.)),
+  to = as.numeric(sub("^\\d+\\s+(\\d+).*", "\\1", D$X0.4...weight...0.002105263157894737.)),
+  weight = as.numeric(sub(".*'weight':\\s*([0-9.]+).*", "\\1", D$X0.4...weight...0.002105263157894737.))
+)
+
+# Create the graph
+g <- graph_from_data_frame(edges_df, directed = TRUE)
+plot(g)
+
+```
+
+
+```{r}
+```
