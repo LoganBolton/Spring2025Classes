@@ -5,12 +5,12 @@ output: pdf_document
 date: "2025-02-08"
 ---
 
+# Setup
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 setwd("/Users/log/Github/Spring2025Classes/social_networks/project2")
 D <- read.csv("congress_network/congress.edgelist")
 ```
-
 
 ```{r}
 print("Data structure:")
@@ -35,10 +35,52 @@ edges_df <- data.frame(
 
 # Create the graph
 g <- graph_from_data_frame(edges_df, directed = TRUE)
-plot(g)
+```
+
+# Graph Characteristics
+## Network Understanding
+```{r Network Understanding}
+print("Network Order (number of vertices):")
+vcount(g)
+
+# Network size (number of edges)
+print("Network Size (number of edges):")
+ecount(g)
+
+# Network density
+print("Network Density:")
+edge_density(g)
+
+# Check strong connectivity
+components <- components(g, mode="strong")
+cat("\nNumber of strongly connected components:", components$no, "\n")
+cat("Size of largest strongly connected component:", max(components$csize), "\n")
 
 ```
 
+## Degree Distribution
+```{r degree distribution}
+# Calculate different degree measures
+in_deg <- degree(g, mode="in")
+out_deg <- degree(g, mode="out")
+total_deg <- degree(g, mode="total")
 
-```{r}
+par ( mfrow = c (1 ,2))
+hist ( in_deg , main = " In - Degree Distribution " ,
+xlab = " In - Degree " , ylab = " Frequency " , col = " lightblue " )
+hist ( out_deg , main = " Out - Degree Distribution " ,
+xlab = " Out - Degree " , ylab = " Frequency " , col = " lightgreen " )
 ```
+
+## PageRank
+
+## Hub and Authority Scores
+
+## Closeness Centrality
+
+## Betweenness Centrality 
+
+# Nodes
+
+# Justification
+
