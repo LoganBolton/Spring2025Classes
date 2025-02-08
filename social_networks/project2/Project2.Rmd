@@ -66,11 +66,14 @@ in_deg <- degree(g, mode="in")
 out_deg <- degree(g, mode="out")
 total_deg <- degree(g, mode="total")
 
-par ( mfrow = c (1 ,2))
+par ( mfrow = c (1 ,3))
 hist ( in_deg , main = " In - Degree Distribution " ,
 xlab = " In - Degree " , ylab = " Frequency " , col = " lightblue " )
 hist ( out_deg , main = " Out - Degree Distribution " ,
 xlab = " Out - Degree " , ylab = " Frequency " , col = " lightgreen " )
+
+hist ( total_deg , main = " Total - Degree Distribution " ,
+xlab = " Total - Degree " , ylab = " Frequency " , col = " lightgreen " )
 ```
 
 ## PageRank
@@ -273,7 +276,7 @@ print(chosen_names)
 ```
 
 # Justification
-The nodes I chose were 212, 71, 25, 140 and 39.
+The nodes I chose were 212 (RepGallagher), 71 (RepCardenas), 25 (SenSanders), 140 (SenDuckworth) and 39 (SenJohnHoeven).
 
-One way to determine the most central nodes is to see which nodes are consistently high across multiple different measurements. Node 212 (RepGallagher) stands out as the most consistently central figure across multiple measurements, with exceptionally high authority and PageRank scores, suggesting that he not only receives attention from other influential politicians but also serves as a crucial node in the flow of political information. His high scores across different centrality measures indicate that his influence is multifaceted rather than limited to a single type of network interaction.  71 (RepCardenas) also appears frequently across this collection of measurements while also maintaining a very high betweenness score. This high betweenness score means that RepCardenas acts like a bridge between different political subsets.  25 (SenSanders) has a very high harmonic closeness that stands out amongst other nodes. This harmonic score means that SenSanders is very well connected and has large amounts of politicians in his local network. 140 (SenDuckworth) has a high authority meaning that he is followed by many powerful politicians. 39 (SenJohnHoeven) has strong betweenness and harmonic closeness scores.
+One way to determine the most central nodes is to see which nodes are consistently high across multiple different measurements. RepGallagher stands out as the most consistently central figure across multiple measurements, with exceptionally high authority and PageRank scores. This suggests that he not only receives attention from other influential politicians, but he also serves as a crucial node in the flow of political information. His high scores across different centrality measures indicate that his influence is also not limited to a single type of network interaction. RepCardenas  also appears frequently across this collection of measurements while also maintaining a very high betweenness score. This high betweenness score means that RepCardenas acts like a bridge between different political subsets. SenSanders has a very high harmonic closeness that stands out amongst other nodes. This harmonic score means that SenSanders is very well connected and has large amounts of politicians in his local network. SenDuckworth has a high authority score suggesting that other influential politicians are closely connected to her. Finally, SenJohnHoeven has strong betweenness and harmonic closeness scores showing that he serves as a bridge between individual groups while also having large amounts of politicians in his local sphere.
 
