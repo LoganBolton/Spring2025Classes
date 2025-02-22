@@ -111,10 +111,69 @@ print(summary(total_degree))
 ```
 
 # Community Detection
+```{r}
+eb_communities <- cluster_edge_betweenness(g)
+eb_membership <- membership(eb_communities)
+eb_modularity <- modularity(eb_communities)
+eb_sizes <- sizes(eb_communities)
 
+# Walktrap Community Detection
+wt_communities <- cluster_walktrap(g)
+wt_membership <- membership(wt_communities)
+wt_modularity <- modularity(wt_communities)
+wt_sizes <- sizes(wt_communities)
+
+# Print summary statistics for both algorithms
+cat("Edge Betweenness Community Detection:\n")
+cat("Number of communities:", length(unique(eb_membership)), "\n")
+cat("Modularity:", round(eb_modularity, 4), "\n")
+cat("Community sizes:\n")
+print(sort(table(eb_membership), decreasing = TRUE)[1:10])
+cat("\n")
+
+cat("Walktrap Community Detection:\n")
+cat("Number of communities:", length(unique(wt_membership)), "\n")
+cat("Modularity:", round(wt_modularity, 4), "\n")
+cat("Community sizes:\n")
+print(sort(table(wt_membership), decreasing = TRUE)[1:10])
+
+# Visualize the communities
+# Function to plot communities with layout optimization
+plot_communities <- function(graph, membership, title) {
+  # Create color palette for communities
+  num_communities <- length(unique(membership))
+  colors <- rainbow(num_communities)
+  
+  # Set vertex colors based on community membership
+  V(graph)$color <- colors[membership]
+  
+  # Calculate layout (using Fruchterman-Reingold algorithm)
+  layout <- layout_with_fr(graph)
+  
+  # Plot the graph
+  plot(graph,
+       layout = layout,
+       vertex.size = 3,
+       vertex.label = NA,
+       edge.arrow.size = 0.2,
+       main = title)
+}
+
+# Set up plotting area for side-by-side comparison
+par(mfrow = c(1, 2))
+
+# Plot both community structures
+plot_communities(g, eb_membership, "Edge Betweenness Communities")
+plot_communities(g, wt_membership, "Walktrap Communities")
+
+# Reset plotting parameters
+par(mfrow = c(1, 1))
+```
 
 # Triad Census Analysis
+```{r}
 
+```
 
 # Modularity/Assortativity Analysis
 
