@@ -8,35 +8,121 @@ date: "2025-02-21"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(igraph)
+library(DirectedClustering)
 ```
 
-# Overall Structure
+# Network Structure Analysis
+Since the graph is NOT strongly connected, we have to find the diameter and radius using the largest strongly connected sub component.
+
+The dataset also does not have duplicate sender -> receiver pairs, so we will analyze the dataset as an unweighted graph.
 
 ```{r overall}
 # Read the text file into a dataframe
-email_df <- read.table("email-Eu-core.txt", header = FALSE, sep = " ")
+df <- read.table("email-Eu-core.txt", header = FALSE, sep = " ")
+colnames(df) <- c("From", "To")
+# The dataset does not hav
+# df_weighted <- aggregate(weight ~ From + To, data = transform(df, weight = 1), FUN = sum)
 
-# Name the columns for clarity (e.g., "From" and "To")
-colnames(email_df) <- c("From", "To")
+g <- graph_from_data_frame(df, directed = TRUE)
+# g <- graph_from_data_frame(df_weighted, directed = TRUE)
 
-# Display the first few rows to verify
-#head(email_df)
+num_nodes = vcount(g)
+num_edges = ecount(g)
 
-# Find duplicated rows (including the first occurrence)
-duplicate_edges <- email_df[duplicated(email_df) | duplicated(email_df, fromLast = TRUE), ]
+# Check strong connectivity
+components <- components(g, mode="strong")
 
-# Count the number of times each edge appears
-edge_counts <- table(email_df$From, email_df$To)
+# Extract the vertices belonging to the largest strongly connected component
+largest_comp_vertices <- V(g)[components$membership == which.max(components$csize)]
+g_largest <- induced_subgraph(g, largest_comp_vertices)
 
-# Convert to a dataframe for easier inspection
-edge_counts_df <- as.data.frame.table(edge_counts, responseName = "Count")
+# Calculate diameter and radius on the largest SCC
+diameter_largest <- diameter(g_largest, directed = TRUE)
+radius_largest <- radius(g_largest, mode = "out")
 
-# Filter for edges with more than one occurrence
-multiple_edges <- edge_counts_df[edge_counts_df$Count > 1, ]
 
-# Display the results
-print(multiple_edges)
-head(multiple_edges)
+output <- paste(
+  "Graph Summary",
+  paste("Number of nodes:", num_nodes),
+  paste("Number of edges:", num_edges),
+  paste("Density:", round(edge_density(g), 6)),
+  paste(""),
+  "Connectivity:",
+  paste("Number of strongly connected components:", components$no),
+  paste("Size of largest strongly connected component:", max(components$csize)),
+  paste("fraction of elements belonging to the largest strong subcomponent: ", max(components$csize)/num_nodes),
+  "The graph is NOT strongly connected",
+  paste("Largest diameter:", diameter_largest),
+  paste("Largest radius:", radius_largest),
+  "-------------------------------------------------------------------",
+  
+  sep = "\n"
+)
+cat(output)
+
 ```
+```{r}
+adj_matrix <- as_adjacency_matrix(g, sparse = FALSE)
+
+# Compute clustering coefficients (cycle type)
+clustering_coeff <- ClustF(adj_matrix, type = "cycle")
+
+# Print the global cycle clustering coefficient
+print(clustering_coeff$GlobalcycleCC)
+
+print(paste("Global out-clustering coefficient:", clustering_coeff$GlobaloutCC))
+```
+
+
+# Degree Distribution Analysis
+
+```{r degree_distribution, echo=TRUE, fig.width=10, fig.height=4}
+# Calculate in-degree, out-degree, and total degree
+in_degree <- degree(g, mode = "in")
+out_degree <- degree(g, mode = "out")
+total_degree <- degree(g, mode = "all")
+
+# Set up a 1x3 plotting layout
+par(mfrow = c(1, 3))
+
+# Plot histogram for in-degree
+hist(in_degree, breaks = 50, main = "In-Degree Distribution", 
+     xlab = "In-Degree", ylab = "Frequency", col = "skyblue", border = "black")
+
+# Plot histogram for out-degree
+hist(out_degree, breaks = 50, main = "Out-Degree Distribution", 
+     xlab = "Out-Degree", ylab = "Frequency", col = "salmon", border = "black")
+
+# Plot histogram for total degree
+hist(total_degree, breaks = 50, main = "Total Degree Distribution", 
+     xlab = "Total Degree", ylab = "Frequency", col = "lightgreen", border = "black")
+
+# Reset plotting layout
+par(mfrow = c(1, 1))
+
+# Summary statistics
+cat("In-Degree Summary:\n")
+print(summary(in_degree))
+cat("\nOut-Degree Summary:\n")
+print(summary(out_degree))
+cat("\nTotal Degree Summary:\n")
+print(summary(total_degree))
+```
+
+# Community Detection
+
+
+# Triad Census Analysis
+
+
+# Modularity/Assortativity Analysis
+
+
+
+
+
+
+# Evaluation
 
 
