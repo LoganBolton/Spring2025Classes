@@ -1,10 +1,11 @@
 ---
-title: "project3"
+title: "Project 3"
 output: pdf_document
 author: "Logan Bolton"
-date: "2025-02-21"
+date: "2025-02-23"
 ---
 
+_Acknowledgement:_ This code was created through the repurposing of code found in the lecture notes and through collaboration with Claude 3.5 Sonnet and o3-mini. These AI tools were very helpful for me while fixing errors and determining the correct syntax to plot graphs.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -55,6 +56,7 @@ output <- paste(
   paste("Size of largest strongly connected component:", max(components$csize)),
   paste("fraction of elements belonging to the largest strong subcomponent: ", max(components$csize)/num_nodes),
   "The graph is NOT strongly connected",
+  paste(""),
   paste("Largest diameter:", diameter_largest),
   paste("Largest radius:", radius_largest),
   "-------------------------------------------------------------------",
@@ -64,6 +66,7 @@ output <- paste(
 cat(output)
 
 ```
+Cluster coefficient computed through the ClustF function found in the DirectedClustering package:
 ```{r coefficient}
 adj_matrix <- as_adjacency_matrix(g, sparse = FALSE)
 
@@ -113,6 +116,7 @@ print(summary(total_degree))
 ```
 
 # Community Detection
+I chose to utilize the Edge Betweenness algorithm and the Walktrap algorithm for community detection. I used these two algorithms because they both work for unweighted, directed graphs and because of how differently they determine communities. 
 ```{r community detection, cache=TRUE} 
 eb_communities <- cluster_edge_betweenness(g)
 eb_membership <- membership(eb_communities)
@@ -173,98 +177,79 @@ par(mfrow = c(1, 1))
 ```
 
 # Triad Census Analysis
+For the walktrap algorithm, these results indicate decent community detection. For the triads, over half are in the same community together. 
+
+However, for the edge betweenness algorithm, the low percentage of about 14% indicates that the algorithm may be breaking up communities into too small of groups. The large difference between both algorithms suggests that walktrap may be better suited than edge betweenness for detection.
+
+Also unrelated note, but the 'triad_census' function here is fantastic. I tried to manually compute all the different triads using my own naive R code and my computer was not able to do that even after 8 hours of computation. I looked into random sampling every N triads per subcomponent of the graph because of these compute restraints, but the following approach was already very efficient and effective, so I abandoned that the N sampling strategy.
 ```{r triad}
-# print(wt_communities)
-# Function to analyze triads in relation to communities
 analyze_triads_communities <- function(g, communities) {
-  # Initialize counters for different triad types
-  triad_counts <- list(
-    same_comm = c(type0 = 0, type1 = 0, type2 = 0, type3 = 0),
-    diff_comm = c(type0 = 0, type1 = 0, type2 = 0, type3 = 0)
-  )
-  # Get all possible triads
-  node_combinations <- combn(V(g), 3)
-  # print(node_combinations)
-  total_triads <- ncol(node_combinations)
-  print(total_triads)
-
-  # Add progress monitoring
-  pb <- txtProgressBar(min = 0, max = total_triads, style = 3)
-
-  # Add timing
-  start_time <- Sys.time()
-
-  for(i in 1:total_triads) {
-    nodes <- node_combinations[,i]
-
-    # Count edges in triad
+  # Get triad census
+  triad_counts <- triad_census(g)
+  
+  # Get community memberships
+  comm_mem <- membership(communities)
+  
+  # Function to check if three nodes form a triangle
+  is_triangle <- function(nodes) {
     subg <- induced_subgraph(g, nodes)
-    edge_count <- ecount(subg)
-
-    # Check if all nodes are in same community
-    comm_memberships <- membership(communities)[nodes]
-    same_community <- length(unique(comm_memberships)) == 1
-
-    # Update counts
-    if(same_community) {
-      triad_counts$same_comm[edge_count + 1] <- triad_counts$same_comm[edge_count + 1] + 1
-    } else {
-      triad_counts$diff_comm[edge_count + 1] <- triad_counts$diff_comm[edge_count + 1] + 1
-    }
-
-    # Update progress bar every 1000 iterations
-    if(i %% 1000 == 0) {
-      setTxtProgressBar(pb, i)
+    return(ecount(subg) >= 2)  # At least 2 edges for directed graph
+  }
+  
+  # Get triangles using cliques
+  # For directed graphs, we look at the underlying undirected graph for triangles
+  g_undir <- as.undirected(g, mode="collapse")
+  triangles <- cliques(g_undir, min=3, max=3)
+  
+  # Count triangles in same community
+  same_comm_triangles <- 0
+  total_triangles <- length(triangles)
+  
+  for(triangle in triangles) {
+    if(length(unique(comm_mem[triangle])) == 1) {
+      same_comm_triangles <- same_comm_triangles + 1
     }
   }
-
-  close(pb)
-  end_time <- Sys.time()
-
-  # Calculate additional statistics
-  total_same_comm <- sum(triad_counts$same_comm)
-  total_diff_comm <- sum(triad_counts$diff_comm)
-
-  # Add proportions and timing to results
+  
+  # Create results
   results <- list(
-    counts = triad_counts,
-    summary = list(
-      total_triads = total_triads,
-      same_comm_prop = triad_counts$same_comm / total_same_comm,
-      diff_comm_prop = triad_counts$diff_comm / total_diff_comm,
-      execution_time = difftime(end_time, start_time, units = "mins")
+    triad_census = triad_counts,
+    triangle_stats = list(
+      total_triangles = total_triangles,
+      same_comm_triangles = same_comm_triangles,
+      percent_same_comm = if(total_triangles > 0) 
+                           (same_comm_triangles/total_triangles) * 100 
+                         else 0
     )
   )
-
+  
   return(results)
 }
 
-# Analyze triads for Walktrap communities
-triad_analysis <- analyze_triads_communities(g, wt_communities)
-
-# Calculate percentages
-total_by_type <- mapply('+', triad_analysis$same_comm, triad_analysis$diff_comm)
-percent_same_comm <- (triad_analysis$same_comm / total_by_type) * 100
+# Analyze both community detection methods
+wt_triad_analysis <- analyze_triads_communities(g, wt_communities)
+eb_triad_analysis <- analyze_triads_communities(g, eb_communities)
 
 # Print results
 cat("Triad Census Analysis Results:\n")
 cat("----------------------------------------\n")
-for(i in 1:4) {
-  cat(sprintf("Triads with %d edges:\n", i-1))
-  cat(sprintf("  Within same community: %.2f%%\n", percent_same_comm[i]))
-  cat(sprintf("  Total count: %d\n", total_by_type[i]))
-  cat("----------------------------------------\n")
-}
+cat("Total triads by type:\n")
+print(wt_triad_analysis$triad_census)
 
-# Visualize results
-barplot(rbind(triad_analysis$same_comm, triad_analysis$diff_comm),
-        beside = TRUE,
-        names.arg = c("0 edges", "1 edge", "2 edges", "3 edges"),
-        col = c("lightblue", "salmon"),
-        main = "Triad Distribution by Community Structure",
-        legend.text = c("Same Community", "Different Communities"),
-        args.legend = list(x = "topright"))
+cat("\nTriangle Statistics:\n")
+cat("Walktrap Communities:\n")
+cat("  Total triangles:", wt_triad_analysis$triangle_stats$total_triangles, "\n")
+cat("  Triangles in same community:", wt_triad_analysis$triangle_stats$same_comm_triangles, "\n")
+cat("  Percentage in same community:", 
+    round(wt_triad_analysis$triangle_stats$percent_same_comm, 2), "%\n")
+
+cat("\nEdge Betweenness Communities:\n")
+cat("  Total triangles:", eb_triad_analysis$triangle_stats$total_triangles, "\n")
+cat("  Triangles in same community:", eb_triad_analysis$triangle_stats$same_comm_triangles, "\n")
+cat("  Percentage in same community:", 
+    round(eb_triad_analysis$triangle_stats$percent_same_comm, 2), "%\n")
 ```
+
 
 # Modularity Analysis
 ```{r}
@@ -276,7 +261,7 @@ cat("Edge Betweenness Modularity: ", eb_mod_value, "\n")
 ```
 
 # Evaluation
-Based off this analysis, neither algorithm did very well at determining the correct communities. The edge betweenness algorithm did better than the walktrap algorithm in terms of NMI (0.444 vs 0.181), however both algorithms scored blose to zero at in ARI. In face, the edge betweenness ARI score of (-0.002) indicates that the algorithm may actually be worse than random. 
+Based off this analysis, neither algorithm did very well at determining the correct communities. The edge betweenness algorithm did better than the walktrap algorithm in terms of NMI (0.444 vs 0.181), however both algorithms scored close to zero in the ARI score. In fact, the edge betweenness ARI score of (-0.002) indicates that the algorithm may actually be worse than random. 
 ```{r}
 gt_communities <- read.table("email-Eu-core-department-labels.txt", header=FALSE)
 colnames(gt_communities) <- c("Node", "Community")
