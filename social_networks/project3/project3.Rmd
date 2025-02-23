@@ -172,6 +172,7 @@ par(mfrow = c(1, 1))
 
 # Triad Census Analysis
 ```{r}
+# print(wt_communities)
 # Function to analyze triads in relation to communities
 analyze_triads_communities <- function(g, communities) {
   # Initialize counters for different triad types
@@ -179,11 +180,19 @@ analyze_triads_communities <- function(g, communities) {
     same_comm = c(type0 = 0, type1 = 0, type2 = 0, type3 = 0),
     diff_comm = c(type0 = 0, type1 = 0, type2 = 0, type3 = 0)
   )
-  
   # Get all possible triads
   node_combinations <- combn(V(g), 3)
+  # print(node_combinations)
+  total_triads <- ncol(node_combinations)
+  print(total_triads)
   
-  for(i in 1:ncol(node_combinations)) {
+  # Add progress monitoring
+  pb <- txtProgressBar(min = 0, max = total_triads, style = 3)
+  
+  # Add timing
+  start_time <- Sys.time()
+  
+  for(i in 1:total_triads) {
     nodes <- node_combinations[,i]
     
     # Count edges in triad
@@ -200,9 +209,32 @@ analyze_triads_communities <- function(g, communities) {
     } else {
       triad_counts$diff_comm[edge_count + 1] <- triad_counts$diff_comm[edge_count + 1] + 1
     }
+    
+    # Update progress bar every 1000 iterations
+    if(i %% 1000 == 0) {
+      setTxtProgressBar(pb, i)
+    }
   }
   
-  return(triad_counts)
+  close(pb)
+  end_time <- Sys.time()
+  
+  # Calculate additional statistics
+  total_same_comm <- sum(triad_counts$same_comm)
+  total_diff_comm <- sum(triad_counts$diff_comm)
+  
+  # Add proportions and timing to results
+  results <- list(
+    counts = triad_counts,
+    summary = list(
+      total_triads = total_triads,
+      same_comm_prop = triad_counts$same_comm / total_same_comm,
+      diff_comm_prop = triad_counts$diff_comm / total_diff_comm,
+      execution_time = difftime(end_time, start_time, units = "mins")
+    )
+  )
+  
+  return(results)
 }
 
 # Analyze triads for Walktrap communities
@@ -230,4 +262,21 @@ barplot(rbind(triad_analysis$same_comm, triad_analysis$diff_comm),
         main = "Triad Distribution by Community Structure",
         legend.text = c("Same Community", "Different Communities"),
         args.legend = list(x = "topright"))
+```
+
+# Modularity Analysis
+```{r}
+wt_mod_value <- modularity(g, wt_membership)
+eb_mod_value <- modularity(g, eb_membership)
+
+cat("Walktrap Modularity: ", wt_mod_value, "\n")
+cat("Edge Betweenness Modularity: ", eb_mod_value, "\n")
+```
+
+# Evaluation
+```{r}
+gt_df <- read.table("email-Eu-core.txt", header = FALSE, sep = " ")
+colnames(gt_df) <- c("Node", "gt")
+
+
 ```
