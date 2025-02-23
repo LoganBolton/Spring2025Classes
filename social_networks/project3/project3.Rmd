@@ -172,16 +172,62 @@ par(mfrow = c(1, 1))
 
 # Triad Census Analysis
 ```{r}
+# Function to analyze triads in relation to communities
+analyze_triads_communities <- function(g, communities) {
+  # Initialize counters for different triad types
+  triad_counts <- list(
+    same_comm = c(type0 = 0, type1 = 0, type2 = 0, type3 = 0),
+    diff_comm = c(type0 = 0, type1 = 0, type2 = 0, type3 = 0)
+  )
+  
+  # Get all possible triads
+  node_combinations <- combn(V(g), 3)
+  
+  for(i in 1:ncol(node_combinations)) {
+    nodes <- node_combinations[,i]
+    
+    # Count edges in triad
+    subg <- induced_subgraph(g, nodes)
+    edge_count <- ecount(subg)
+    
+    # Check if all nodes are in same community
+    comm_memberships <- membership(communities)[nodes]
+    same_community <- length(unique(comm_memberships)) == 1
+    
+    # Update counts
+    if(same_community) {
+      triad_counts$same_comm[edge_count + 1] <- triad_counts$same_comm[edge_count + 1] + 1
+    } else {
+      triad_counts$diff_comm[edge_count + 1] <- triad_counts$diff_comm[edge_count + 1] + 1
+    }
+  }
+  
+  return(triad_counts)
+}
 
+# Analyze triads for Walktrap communities
+triad_analysis <- analyze_triads_communities(g, wt_communities)
+
+# Calculate percentages
+total_by_type <- mapply('+', triad_analysis$same_comm, triad_analysis$diff_comm)
+percent_same_comm <- (triad_analysis$same_comm / total_by_type) * 100
+
+# Print results
+cat("Triad Census Analysis Results:\n")
+cat("----------------------------------------\n")
+for(i in 1:4) {
+  cat(sprintf("Triads with %d edges:\n", i-1))
+  cat(sprintf("  Within same community: %.2f%%\n", percent_same_comm[i]))
+  cat(sprintf("  Total count: %d\n", total_by_type[i]))
+  cat("----------------------------------------\n")
+}
+
+# Visualize results
+barplot(rbind(triad_analysis$same_comm, triad_analysis$diff_comm),
+        beside = TRUE,
+        names.arg = c("0 edges", "1 edge", "2 edges", "3 edges"),
+        col = c("lightblue", "salmon"),
+        main = "Triad Distribution by Community Structure",
+        legend.text = c("Same Community", "Different Communities"),
+        args.legend = list(x = "topright"))
 ```
-
-# Modularity/Assortativity Analysis
-
-
-
-
-
-
-# Evaluation
-
-
