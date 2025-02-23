@@ -10,6 +10,8 @@ date: "2025-02-21"
 knitr::opts_chunk$set(echo = TRUE)
 library(igraph)
 library(DirectedClustering)
+library(aricode)
+
 ```
 
 # Network Structure Analysis
@@ -62,7 +64,7 @@ output <- paste(
 cat(output)
 
 ```
-```{r}
+```{r coefficient}
 adj_matrix <- as_adjacency_matrix(g, sparse = FALSE)
 
 # Compute clustering coefficients (cycle type)
@@ -111,7 +113,7 @@ print(summary(total_degree))
 ```
 
 # Community Detection
-```{r}
+```{r community detection, cache=TRUE} 
 eb_communities <- cluster_edge_betweenness(g)
 eb_membership <- membership(eb_communities)
 eb_modularity <- modularity(eb_communities)
@@ -171,7 +173,7 @@ par(mfrow = c(1, 1))
 ```
 
 # Triad Census Analysis
-```{r}
+```{r triad}
 # print(wt_communities)
 # Function to analyze triads in relation to communities
 analyze_triads_communities <- function(g, communities) {
@@ -185,44 +187,44 @@ analyze_triads_communities <- function(g, communities) {
   # print(node_combinations)
   total_triads <- ncol(node_combinations)
   print(total_triads)
-  
+
   # Add progress monitoring
   pb <- txtProgressBar(min = 0, max = total_triads, style = 3)
-  
+
   # Add timing
   start_time <- Sys.time()
-  
+
   for(i in 1:total_triads) {
     nodes <- node_combinations[,i]
-    
+
     # Count edges in triad
     subg <- induced_subgraph(g, nodes)
     edge_count <- ecount(subg)
-    
+
     # Check if all nodes are in same community
     comm_memberships <- membership(communities)[nodes]
     same_community <- length(unique(comm_memberships)) == 1
-    
+
     # Update counts
     if(same_community) {
       triad_counts$same_comm[edge_count + 1] <- triad_counts$same_comm[edge_count + 1] + 1
     } else {
       triad_counts$diff_comm[edge_count + 1] <- triad_counts$diff_comm[edge_count + 1] + 1
     }
-    
+
     # Update progress bar every 1000 iterations
     if(i %% 1000 == 0) {
       setTxtProgressBar(pb, i)
     }
   }
-  
+
   close(pb)
   end_time <- Sys.time()
-  
+
   # Calculate additional statistics
   total_same_comm <- sum(triad_counts$same_comm)
   total_diff_comm <- sum(triad_counts$diff_comm)
-  
+
   # Add proportions and timing to results
   results <- list(
     counts = triad_counts,
@@ -233,7 +235,7 @@ analyze_triads_communities <- function(g, communities) {
       execution_time = difftime(end_time, start_time, units = "mins")
     )
   )
-  
+
   return(results)
 }
 
@@ -274,9 +276,53 @@ cat("Edge Betweenness Modularity: ", eb_mod_value, "\n")
 ```
 
 # Evaluation
+Based off this analysis, neither algorithm did very well at determining the correct communities. The edge betweenness algorithm did better than the walktrap algorithm in terms of NMI (0.444 vs 0.181), however both algorithms scored blose to zero at in ARI. In face, the edge betweenness ARI score of (-0.002) indicates that the algorithm may actually be worse than random. 
 ```{r}
-gt_df <- read.table("email-Eu-core.txt", header = FALSE, sep = " ")
-colnames(gt_df) <- c("Node", "gt")
+gt_communities <- read.table("email-Eu-core-department-labels.txt", header=FALSE)
+colnames(gt_communities) <- c("Node", "Community")
+
+# Convert memberships to vectors ensuring they use the same node ordering
+gt_membership <- gt_communities$Community
+wt_membership_ordered <- membership(wt_communities)[order(as.numeric(V(g)))]
+eb_membership_ordered <- membership(eb_communities)[order(as.numeric(V(g)))]
+
+# Calculate NMI
+nmi_wt <- NMI(gt_membership, wt_membership_ordered)
+nmi_eb <- NMI(gt_membership, eb_membership_ordered)
+
+# Calculate ARI
+ari_wt <- ARI(gt_membership, wt_membership_ordered)
+ari_eb <- ARI(gt_membership, eb_membership_ordered)
+
+# Print results
+cat("Comparison with Ground Truth:\n")
+cat("Walktrap Algorithm:\n")
+cat("  NMI:", nmi_wt, "\n")
+cat("  ARI:", ari_wt, "\n")
+cat("\nEdge Betweenness Algorithm:\n")
+cat("  NMI:", nmi_eb, "\n")
+cat("  ARI:", ari_eb, "\n")
+
+# Create visualization comparing community sizes
+par(mfrow=c(1,3))
+
+# Ground Truth distribution
+barplot(table(gt_membership), 
+        main="Ground Truth Community Sizes",
+        xlab="Community ID", 
+        ylab="Size")
+
+# Walktrap distribution
+barplot(table(wt_membership), 
+        main="Walktrap Community Sizes",
+        xlab="Community ID", 
+        ylab="Size")
+
+# Edge Betweenness distribution
+barplot(table(eb_membership), 
+        main="Edge Betweenness Community Sizes",
+        xlab="Community ID", 
+        ylab="Size")
 
 
 ```
