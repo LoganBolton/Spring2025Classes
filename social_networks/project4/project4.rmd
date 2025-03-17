@@ -21,15 +21,15 @@ num_nodes = vcount(g)
 num_edges = ecount(g)
 
 # Check strong connectivity
-components <- components(g, mode="strong")
+components <- components(g)
 
 # Extract the vertices belonging to the largest strongly connected component
 largest_comp_vertices <- V(g)[components$membership == which.max(components$csize)]
 g_largest <- induced_subgraph(g, largest_comp_vertices)
 
 # Calculate diameter and radius on the largest SCC
-diameter_largest <- diameter(g_largest, directed = TRUE)
-radius_largest <- radius(g_largest, mode = "out")
+diameter_largest <- diameter(g_largest)
+radius_largest <- radius(g_largest)
 
 
 output <- paste(
@@ -71,10 +71,28 @@ cat(paste("Average local clustering coefficient:", round(avg_local_clustering, 6
 
 # Degree Distribution
 ```{r}
+# Calculate degrees
+deg <- degree(g)
+
+
+# Create plots
+par(mfrow=c(1,1))  # Set up a 1x3 plotting area
+
+# Plot total degree distribution
+hist(deg, 
+     breaks = 80,  # Increase the number of buckets/bins
+     main = "Total Degree Distribution",
+     xlab = "Degree", 
+     col = "lightblue",
+     border = "white",
+     xlim = c(0, max(deg)-170))
+
+
+
 ```
 
 # Cosine Similarity Matrix
-```{r}
+```{r, cosine, cache=TRUE}
 # Calculate the adjacency matrix
 adj_matrix <- as_adjacency_matrix(g, sparse = FALSE)
 
@@ -114,19 +132,141 @@ cosine_sim_values <- cosine_sim_matrix[lower.tri(cosine_sim_matrix)]
 cat("\nSummary of Cosine Similarity Values:\n")
 print(summary(cosine_sim_values))
 ```
+# Pearson
+```{r}
+pearson_corr_matrix <- cor(t(adj_matrix))
+
+cat("\nPearson Correlation Matrix (sample of first 5x5):\n")
+print(pearson_corr_matrix[1:5, 1:5])
+
+
+```
 
 # Blockmodeling
+## Clustering Based
 ```{r}
+#--- Clustering-Based Blockmodeling Analysis ---#
+
+# Assume that adj_matrix is already computed (see your earlier code).
+# Compute Euclidean distance matrix based on the rows of the adjacency matrix
+d_euc <- dist(adj_matrix, method = "euclidean")
+
+# Perform hierarchical clustering (using Ward's method)
+hc <- hclust(d_euc, method = "ward.D2")
+
+# Choose a number of clusters (e.g., k = 3; you may adjust as needed)
+k <- 3
+membership_clust <- cutree(hc, k = k)
+
+# Permute the adjacency matrix based on the clustering membership IDs
+order_indices <- order(membership_clust)
+adj_perm <- adj_matrix[order_indices, order_indices]
+
+# Plot the heatmap of the permuted adjacency matrix
+heatmap(adj_perm, Rowv = NA, Colv = NA, 
+        main = "Permuted Adjacency Matrix (Clustering-Based)",
+        xlab = "Nodes", ylab = "Nodes")
+
+# Compute the image (block) matrix: average edge value within each cluster pair
+image_matrix <- matrix(0, nrow = k, ncol = k)
+for(i in 1:k){
+  for(j in 1:k){
+    # Identify the block entries corresponding to clusters i and j
+    block <- adj_perm[which(membership_clust[order_indices] == i),
+                      which(membership_clust[order_indices] == j)]
+    image_matrix[i, j] <- mean(block)
+  }
+}
+
+# Plot the blockmodel (heatmap of the image matrix)
+heatmap(image_matrix, Rowv = NA, Colv = NA, 
+        main = "Blockmodel (Clustering-Based Method)",
+        xlab = "Cluster", ylab = "Cluster")
+
+# Evaluate the goodness of fit:
+# Reconstruct the adjacency matrix from the image matrix
+reconstructed <- matrix(0, nrow = nrow(adj_matrix), ncol = ncol(adj_matrix))
+for(i in 1:k){
+  for(j in 1:k){
+    indices_i <- which(membership_clust == i)
+    indices_j <- which(membership_clust == j)
+    reconstructed[indices_i, indices_j] <- image_matrix[i, j]
+  }
+}
+# Compute a simple error measure: sum of squared differences
+fit_error <- sum((adj_matrix - reconstructed)^2)
+cat("Goodness of Fit (Sum of Squared Errors) for Clustering-Based Method:", fit_error, "\n")
 ```
 
-# Degree Distribution
+# MultiDimensionsal Scaling
 ```{r}
+#--- MDS-Based Blockmodeling Analysis ---#
+
+# Again, using the same Euclidean distance matrix as before:
+d_euc <- dist(adj_matrix, method = "euclidean")
+
+# Perform classical multidimensional scaling (MDS) to obtain a 2D representation
+mds_coords <- cmdscale(d_euc, k = 2)
+
+# Optionally, visualize the MDS coordinates
+plot(mds_coords, main = "MDS Plot", xlab = "Dimension 1", ylab = "Dimension 2", pch = 19)
+
+# Cluster the MDS coordinates using k-means (using k = 3 clusters for consistency)
+set.seed(123)  # for reproducibility
+k <- 3
+kmeans_result <- kmeans(mds_coords, centers = k)
+membership_mds <- kmeans_result$cluster
+
+# Permute the original adjacency matrix based on the k-means membership from MDS
+order_indices_mds <- order(membership_mds)
+adj_perm_mds <- adj_matrix[order_indices_mds, order_indices_mds]
+
+# Plot the heatmap of the permuted adjacency matrix (MDS-based clustering)
+heatmap(adj_perm_mds, Rowv = NA, Colv = NA, 
+        main = "Permuted Adjacency Matrix (MDS-Based Clustering)",
+        xlab = "Nodes", ylab = "Nodes")
+
+# Compute the image (block) matrix for the MDS-based clustering
+image_matrix_mds <- matrix(0, nrow = k, ncol = k)
+for(i in 1:k){
+  for(j in 1:k){
+    block <- adj_perm_mds[which(membership_mds[order_indices_mds] == i),
+                          which(membership_mds[order_indices_mds] == j)]
+    image_matrix_mds[i, j] <- mean(block)
+  }
+}
+
+# Plot the blockmodel for the MDS-based method
+heatmap(image_matrix_mds, Rowv = NA, Colv = NA, 
+        main = "Blockmodel (MDS-Based Method)",
+        xlab = "Cluster", ylab = "Cluster")
+
+# Evaluate the goodness of fit for the MDS-based method:
+# Reconstruct the full matrix from the image matrix based on the MDS clustering membership
+reconstructed_mds <- matrix(0, nrow = nrow(adj_matrix), ncol = ncol(adj_matrix))
+for(i in 1:k){
+  for(j in 1:k){
+    indices_i <- which(membership_mds == i)
+    indices_j <- which(membership_mds == j)
+    reconstructed_mds[indices_i, indices_j] <- image_matrix_mds[i, j]
+  }
+}
+fit_error_mds <- sum((adj_matrix - reconstructed_mds)^2)
+cat("Goodness of Fit (Sum of Squared Errors) for MDS-Based Method:", fit_error_mds, "\n")
+
 ```
 
-# Degree Distribution
-```{r}
-```
 
-# Degree Distribution
-```{r}
-```
+# Interpet the Blockmodel
+## MDS Block Model
+### Within Block
+Clusters 1 and 3 have a very strong internal connection. This is in contrast to cluster 2 which has a very low internal connection.
+### Between Block
+The connection between clusters 1 and 2 is a dark color in one direction but light in the other. This suggests that Cluster 1 may have strong ties directed toward cluster 2, but not vice versa.
+There appears to be some limited connection between clusters 1 and 3, but it is not significant. My assumption based off this blockmodel is that clusters 1 and 3 are distinct groups with cluster 2 serving as a sort of intermediary. 
+
+## Clustering Based
+### Within Block
+Clusters 2 and 3 have very strong internal connections while cluster 1 does not. 
+### Between Block
+Clusters 1 and 3 have strong connections between them. In contrast, cluster 2 does not have any strong connections to other clusters. Based off these results, my assumption would be that clusters 1 and 3 have are related communities while cluster 2 is largely independent.

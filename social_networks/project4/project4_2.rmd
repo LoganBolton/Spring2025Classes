@@ -1,0 +1,257 @@
+---
+title: "Project 4"
+output: html_document
+author: "Logan Bolton"
+date: "2025-03-10"
+---
+
+_Acknowledgement:_ This code was created through the repurposing of code found in the lecture notes and through collaboration with Claude 3.5 Sonnet and o3-mini. These AI tools were very helpful for me while fixing errors and determining the correct syntax to plot graphs.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, dev = "png", dpi = 96)
+library(igraph)
+library(distances)  # Faster distance calculations
+library(parallelDist)
+library(smacof)
+library(magick)
+
+
+```
+
+# 1 - Network Structure
+```{r overall}
+edges <- read.csv("/Users/log/Github/Spring2025Classes/social_networks/project4/lasftm_asia/lastfm_asia_edges.csv")
+g <- graph_from_data_frame(edges, directed = FALSE)
+num_nodes = vcount(g)
+num_edges = ecount(g)
+
+# Check strong connectivity
+components <- components(g)
+
+# Extract the vertices belonging to the largest strongly connected component
+largest_comp_vertices <- V(g)[components$membership == which.max(components$csize)]
+g_largest <- induced_subgraph(g, largest_comp_vertices)
+
+# Calculate diameter and radius on the largest SCC
+diameter_largest <- diameter(g_largest)
+radius_largest <- radius(g_largest)
+
+
+output <- paste(
+  "Graph Summary",
+  paste("Number of nodes:", num_nodes),
+  paste("Number of edges:", num_edges),
+  paste("Density:", round(edge_density(g), 6)),
+  paste(""),
+  "Connectivity:",
+  paste("Number of strongly connected components:", components$no),
+  paste("Size of largest strongly connected component:", max(components$csize)),
+  paste("fraction of elements belonging to the largest strong subcomponent: ", max(components$csize)/num_nodes),
+  "The graph IS strongly connected",
+  paste(""),
+  paste("Largest diameter:", diameter_largest),
+  paste("Largest radius:", radius_largest),
+  "-------------------------------------------------------------------",
+  
+  sep = "\n"
+)
+cat(output)
+```
+
+```{r coefficient}
+# Calculate global clustering coefficient (transitivity)
+global_clustering <- transitivity(g, type = "global")
+
+# Calculate local clustering coefficients for each node
+local_clustering <- transitivity(g, type = "local")
+
+# Calculate average local clustering coefficient
+avg_local_clustering <- mean(local_clustering, na.rm = TRUE)
+
+# Add to your output
+cat("\nClustering Coefficients:\n")
+cat(paste("Global clustering coefficient (transitivity):", round(global_clustering, 6), "\n"))
+cat(paste("Average local clustering coefficient:", round(avg_local_clustering, 6), "\n"))
+```
+
+# Degree Distribution
+```{r}
+# Calculate degrees
+deg <- degree(g)
+
+
+# Create plots
+par(mfrow=c(1,1))  # Set up a 1x3 plotting area
+
+# Plot total degree distribution
+hist(deg, 
+     breaks = 80,  # Increase the number of buckets/bins
+     main = "Total Degree Distribution",
+     xlab = "Degree", 
+     col = "lightblue",
+     border = "white",
+     xlim = c(0, max(deg)-170))
+
+
+
+```
+
+# Cosine Similarity Matrix
+```{r, cosine, cache=TRUE}
+# # Calculate the adjacency matrix
+adj_matrix <- as_adjacency_matrix(g, sparse = FALSE)
+# 
+# # Calculate row norms
+# norms <- sqrt(rowSums(adj_matrix^2))
+# 
+# # Compute cosine similarity matrix using vectorized operations
+# cosine_sim_matrix <- (adj_matrix %*% t(adj_matrix)) / (norms %o% norms)
+# 
+# write.csv(cosine_sim_matrix, "cosine_similarity_matrix.csv")
+# 
+# # You can also analyze the distribution of similarities
+# cosine_sim_values <- cosine_sim_matrix[lower.tri(cosine_sim_matrix)]
+# cat("\nSummary of Cosine Similarity Values:\n")
+# print(summary(cosine_sim_values))
+
+cosine_sim_matrix_loaded <- read.csv("cosine_similarity_matrix.csv", row.names = 1)
+
+# Convert it back to a matrix (since read.csv returns a data frame)
+cosine_sim_matrix_loaded <- as.matrix(cosine_sim_matrix_loaded)
+
+# View the first few rows of the loaded matrix
+print(cosine_sim_matrix_loaded[1:5, 1:5])
+```
+
+# Pearson
+```{r pearson, cache=TRUE}
+pearson_corr_matrix <- cor(t(adj_matrix))
+
+cat("\nPearson Correlation Matrix (sample of first 5x5):\n")
+print(pearson_corr_matrix[1:5, 1:5])
+
+```
+
+# Blockmodeling
+## Clustering Based
+```{r, cluster, cache=TRUE}
+#--- Clustering-Based Blockmodeling Analysis ---#
+
+# d_euc <- dist(adj_matrix, method = "euclidean")
+# d_euc_dist <- distances::distances(adj_matrix)  # Euclidean is the default
+# d_euc <- as.dist(as.matrix(d_euc_dist))
+d_euc <- parDist(adj_matrix, method = "euclidean")
+
+
+
+# hierarchical clustering 
+hc <- hclust(d_euc, method = "ward.D2")
+k <- 3
+membership_clust <- cutree(hc, k = k)
+
+# Permute the adjacency matrix based on the clustering membership IDs
+order_indices <- order(membership_clust)
+adj_perm <- adj_matrix[order_indices, order_indices]
+
+# Plot the heatmap of the permuted adjacency matrix
+heatmap(adj_perm, Rowv = NA, Colv = NA, 
+        main = "Permuted Adjacency Matrix (Clustering-Based)",
+        xlab = "Nodes", ylab = "Nodes")
+
+# Compute the image (block) matrix: average edge value within each cluster pair
+image_matrix <- matrix(0, nrow = k, ncol = k)
+for(i in 1:k){
+  for(j in 1:k){
+    # Identify the block entries corresponding to clusters i and j
+    block <- adj_perm[which(membership_clust[order_indices] == i),
+                      which(membership_clust[order_indices] == j)]
+    image_matrix[i, j] <- mean(block)
+  }
+}
+
+# Plot the blockmodel (heatmap of the image matrix)
+heatmap(image_matrix, Rowv = NA, Colv = NA, 
+        main = "Blockmodel (Clustering-Based Method)",
+        xlab = "Cluster", ylab = "Cluster")
+
+# Evaluate the goodness of fit:
+# Reconstruct the adjacency matrix from the image matrix
+reconstructed <- matrix(0, nrow = nrow(adj_matrix), ncol = ncol(adj_matrix))
+for(i in 1:k){
+  for(j in 1:k){
+    indices_i <- which(membership_clust == i)
+    indices_j <- which(membership_clust == j)
+    reconstructed[indices_i, indices_j] <- image_matrix[i, j]
+  }
+}
+# Compute a simple error measure: sum of squared differences
+fit_error <- sum((adj_matrix - reconstructed)^2)
+cat("Goodness of Fit (Sum of Squared Errors) for Clustering-Based Method:", fit_error, "\n")
+```
+
+# MultiDimensionsal Scaling
+```{r, MDS, cache=TRUE}
+mds_result <- mds(d_euc, ndim = 2, type = "ratio")
+mds_coords <- mds_result$conf
+
+# Plot the MDS coordinates
+plot(mds_coords, main = "MDS Plot", xlab = "Dimension 1", ylab = "Dimension 2", pch = 19)
+
+# Perform k-means clustering on the MDS coordinates (using k = 3 clusters)
+set.seed(123)  # for reproducibility
+k <- 3
+kmeans_result <- kmeans(mds_coords, centers = k)
+membership_mds <- kmeans_result$cluster
+
+# Permute the original adjacency matrix based on k-means membership from MDS
+order_indices_mds <- order(membership_mds)
+adj_perm_mds <- adj_matrix[order_indices_mds, order_indices_mds]
+
+# Plot the heatmap of the permuted adjacency matrix (MDS-based clustering)
+heatmap(adj_perm_mds, Rowv = NA, Colv = NA,
+        main = "Permuted Adjacency Matrix (MDS-Based Clustering)",
+        xlab = "Nodes", ylab = "Nodes")
+
+# Reorder the cluster membership according to the permutation
+permuted_clusters <- membership_mds[order_indices_mds]
+n <- length(permuted_clusters)
+
+# Create grouping vectors that match the flattened matrix length
+row_groups <- rep(permuted_clusters, each = n)
+col_groups <- rep(permuted_clusters, times = n)
+
+# Compute the block (image) matrix: average edge value within each cluster pair
+image_matrix_mds <- tapply(as.vector(adj_perm_mds), list(row_groups, col_groups), mean)
+
+# Plot the blockmodel (heatmap of the block matrix)
+heatmap(image_matrix_mds, Rowv = NA, Colv = NA,
+        main = "Blockmodel (MDS-Based Method)",
+        xlab = "Cluster", ylab = "Cluster")
+
+# Reconstruct the full matrix from the block matrix using the original membership
+reconstructed_mds <- image_matrix_mds[membership_mds, membership_mds]
+
+# Compute the goodness of fit: sum of squared errors between the original and reconstructed matrices
+fit_error_mds <- sum((adj_matrix - reconstructed_mds)^2)
+cat("Goodness of Fit (Sum of Squared Errors) for MDS-Based Method:", fit_error_mds, "\n")
+
+```
+
+
+# Interpet the Blockmodel
+## MDS Block Model
+
+### Within Block
+Cluster 1, 2 and 3 all have strong internal connections. This is in contrast to the clustering based method which does not show a strong internal connection with Cluster 1.
+
+### Between Block
+All of the clusters have very limited connections between each other. However, there is a stronger connection from 1 to 2 and 2 to 1 than the other clusters. This analysis suggests that each of the clusters are largely self contained with little intermediary connections.
+
+## Clustering Based
+
+### Within Block
+Clusters 2 and 3 have very strong internal connections while cluster 1 does not. 
+
+### Between Block
+Clusters 1 and 3 have strong connections between them. In contrast, cluster 2 does not have any strong connections to other clusters. Based off these results, my assumption would be that clusters 1 and 3 have are related communities while cluster 2 is largely independent.
