@@ -24,11 +24,10 @@ The dataset also does not have duplicate sender -> receiver pairs, so we will an
 # Read the text file into a dataframe
 df <- read.table("email-Eu-core.txt", header = FALSE, sep = " ")
 colnames(df) <- c("From", "To")
-# The dataset does not have weights so I abandoned this approach:
+# The dataset does not hav
 # df_weighted <- aggregate(weight ~ From + To, data = transform(df, weight = 1), FUN = sum)
 
 g <- graph_from_data_frame(df, directed = TRUE)
-# No need for weights
 # g <- graph_from_data_frame(df_weighted, directed = TRUE)
 
 num_nodes = vcount(g)
