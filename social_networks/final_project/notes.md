@@ -24,4 +24,4 @@ You can look at a node and determine its parent
 you can look at an arrow and determine its parent
 
 ## layer 0, head 12
-something going on idk
+A parent node to all the child nodes in a graph
