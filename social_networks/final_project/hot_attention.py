@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import math
-# Import Polygon <<< KEEP THIS IMPORT
 from matplotlib.patches import Polygon
 import re
 import os
@@ -13,8 +12,8 @@ from typing import Optional, List
 # --- (Keep existing code: Model/Tokenizer Loading, Text Prep, Tag Finding, Inference) ---
 # [ ... Your existing setup code ... ]
 # Step 1: Load model and tokenizer locally
-# model_name = "meta-llama/Llama-3.1-8B"
-model_name = "meta-llama/Llama-3.2-1B" # Using smaller model for faster testing
+model_name = "meta-llama/Llama-3.1-8B"
+# model_name = "meta-llama/Llama-3.2-1B" # Using smaller model for faster testing
 
 try:
     tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=True)
@@ -419,7 +418,8 @@ def plot_individual_attention_maps(
 # --- Run Visualization (Same parameters as before) ---
 N_TOP_VALUES = 5
 SELECTED_LAYERS = [0]
-SELECTED_HEADS = [0]
+# SELECTED_HEADS = [0]
+SELECTED_HEADS = [i for i in range(32)]
 output_directory_top_n = f"hot/individual_maps_top{N_TOP_VALUES}"
 
 plot_individual_attention_maps(
