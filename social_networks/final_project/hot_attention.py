@@ -4,26 +4,28 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import math
-# Import Polygon for clipping
+# Import Polygon <<< KEEP THIS IMPORT
 from matplotlib.patches import Polygon
-import re # Import regular expressions module
-import os # Import os module for directory creation
+import re
+import os
+from typing import Optional, List
 
-# --- (Keep Step 1: Model and Tokenizer Loading - No changes needed) ---
+# --- (Keep existing code: Model/Tokenizer Loading, Text Prep, Tag Finding, Inference) ---
+# [ ... Your existing setup code ... ]
 # Step 1: Load model and tokenizer locally
-model_name = "meta-llama/Llama-3.1-8B"
-# model_name = "meta-llama/Llama-3.2-1B"
-# Using a cached version if available, otherwise download
+# model_name = "meta-llama/Llama-3.1-8B"
+model_name = "meta-llama/Llama-3.2-1B" # Using smaller model for faster testing
+
 try:
     tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=True)
     model = LlamaForCausalLM.from_pretrained(
         model_name,
         output_attentions=True,
-        device_map="cpu", # Keep on CPU if memory is limited
-        torch_dtype=torch.float32, # Use float32 for broader compatibility if needed
+        device_map="cpu", # Keep on CPU for wider compatibility if memory is limited
+        torch_dtype=torch.float32,
         low_cpu_mem_usage=True,
         local_files_only=True,
-        attn_implementation="eager" # Add to suppress warning
+        attn_implementation="eager" # Ensure we get standard attention tensors
     )
     print(f"Loaded model {model_name} from local cache.")
 except Exception as e:
@@ -32,13 +34,12 @@ except Exception as e:
     model = LlamaForCausalLM.from_pretrained(
         model_name,
         output_attentions=True,
-        device_map="cpu", # Keep on CPU
-        torch_dtype=torch.float32, # Use float32
+        device_map="cpu", # Keep on CPU for wider compatibility if memory is limited
+        torch_dtype=torch.float32,
         low_cpu_mem_usage=True,
-        attn_implementation="eager" # Add to suppress warning
+        attn_implementation="eager" # Ensure we get standard attention tensors
     )
 
-# --- (Keep Step 2: Text Prep and Token Cleaning - No changes needed) ---
 # Step 2: Prepare input text
 text = """**Reformatted Question:** A machine is set up in such a way that it will <fact1>short circuit if both the black wire and the red wire touch the battery at the same time</fact1>. The machine will <fact2>not short circuit if just one of these wires touches the battery</fact2>. The black wire is designated as the one that is supposed to touch the battery, while the red wire is supposed to remain in some other part of the machine. One day, the <fact3>black wire and the red wire both end up touching the battery at the same time</fact3>. There is a short circuit. Did the <fact4>black wire cause the short circuit</fact4>? Options: - Yes - No
 
@@ -57,7 +58,7 @@ tokens_with_bos = clean_tokens(base_tokens)
 tokens = tokens_with_bos[1:] # Remove [BOS] token
 
 
-# --- (Keep Find Tag Indices Function v4 - No changes needed) ---
+# Find Tag Indices Function v4 (Keep as is)
 def find_tag_indices_multi_token_v4(token_list):
     all_occurrences = {}
     temp_starts = {}
@@ -114,103 +115,101 @@ def find_tag_indices_multi_token_v4(token_list):
         if is_end:
             base_tag_name = f"fact{tag_num_end}"
             if base_tag_name in temp_starts and temp_starts[base_tag_name]:
-                # Retrieve the start index of the opening tag ('<')
                 tag_start_idx_actual = temp_starts[base_tag_name].pop(0)
-                # Calculate the end index *after* the closing tag ('>')
                 tag_end_idx_actual = closing_tag_start_index + end_tag_len
-
                 instance_counters[base_tag_name] = instance_counters.get(base_tag_name, 0) + 1
                 unique_tag_name = f"{base_tag_name}_{instance_counters[base_tag_name]}"
-                # Store the indices covering the entire tag pair
                 all_occurrences[unique_tag_name] = {
                     'tag_start': tag_start_idx_actual,
                     'tag_end': tag_end_idx_actual
                  }
-                i += end_tag_len # Move past the closing tag tokens
+                i += end_tag_len
                 continue
         i += 1
 
     return all_occurrences
 
-
-tag_locations = find_tag_indices_multi_token_v4(tokens) # Use the new function
+tag_locations = find_tag_indices_multi_token_v4(tokens)
 print("\nFound Tag Locations (Indices including tags):")
 if not tag_locations:
     print("  No tags found.")
 for tag, loc in tag_locations.items():
     print(f"  {tag}: Start Index={loc['tag_start']}, End Index (Exclusive)={loc['tag_end']}")
 
-
-# --- Find 'Answer' token index ---
+# Find 'Answer' token index (Keep as is)
 target_token = 'Answer' # Note the leading space from cleaning
 try:
-    # Find the index *after* removing BOS
     answer_token_index = tokens.index(target_token)
     print(f"\nFound '{target_token}' token at index: {answer_token_index}")
 except ValueError:
     print(f"\nWarning: '{target_token}' token not found in the token list.")
-    answer_token_index = -1 # Use -1 to indicate not found
+    answer_token_index = -1
 
-
-# --- (Keep Step 3: Inference and Attention Extraction - No changes needed) ---
-# Step 3: Run inference and extract attention weights
+# Step 3: Run inference and extract attention weights (Keep as is)
 with torch.no_grad():
     outputs = model(**inputs)
-attentions = outputs.attentions
+attentions = outputs.attentions # Tuple of tensors, one for each layer
 num_layers = model.config.num_hidden_layers
-num_heads = model.config.num_attention_heads # Use config for heads
-seq_len = len(tokens)
+num_heads = model.config.num_attention_heads
+seq_len = len(tokens) # Use actual token length after removing BOS
 
-
-# --- (Keep Step 5: Print Model Info - No changes needed) ---
-# Step 5: Print model info
+# Step 5: Print model info (Keep as is)
 print(f"\nModel: {model_name}")
 print(f"Layers: {num_layers}, Heads per layer: {num_heads}")
 print(f"Sequence length: {seq_len}")
 
 
-# --- Modified Plotting Function (Manual Grid, Saves Individual Files, Adds Black Line) ---
+# --- Modified Plotting Function with Upper Triangle White Mask ---
 def plot_individual_attention_maps(
     tag_indices,
-    answer_idx, # <-- Add parameter for answer index
-    layers_to_show=[0],
-    heads_to_show=[0],
-    output_dir="hot", # Directory to save images
-    base_filename="attention_map", # Base name for saved files
-    line_color='red',       # Color for tag boundary lines
-    line_style='--',      # Style for tag boundary lines
-    line_width=1,         # Width for tag boundary lines
-    grid_line_color='black', # Color for the cell grid lines
-    grid_line_width=0.15,    # Width for the cell grid lines
-    shade_color='grey',
-    shade_alpha=0.25,
-    number_fontsize=30,
-    number_alpha=0.4,
-    number_color='black',
-    answer_line_color='black', # <-- Color for the answer line
-    answer_line_width=1.5,      # <-- Width for the answer line
-    answer_line_style='-'       # <-- Style for the answer line (solid)
+    answer_idx,
+    layers_to_show: List[int] = [0],
+    heads_to_show: List[int] = [0],
+    output_dir: str = "hot",
+    base_filename: str = "attention_map",
+    top_n: Optional[int] = None,
+    normalize_rows: bool = False,
+    cmap: str = "Blues",
+    line_color: str = 'red',
+    line_style: str = '--',
+    line_width: float = 1,
+    grid_line_color: str = 'black',
+    grid_line_width: float = 0.15,
+    shade_color: str = 'grey',
+    shade_alpha: float = 0.25,
+    number_fontsize: int = 30,
+    number_alpha: float = 0.4,
+    number_color: str = 'black',
+    answer_line_color: str = 'black',
+    answer_line_width: float = 1.5,
+    answer_line_style: str = '-'
 ):
+    """
+    Generates and saves attention heatmaps, masking the upper triangle with white.
+    (Args documentation remains the same)
+    """
     token_count = len(tokens)
-    base_width = max(12, token_count / 4) # Adjust figsize for single plot
-    base_height = max(12, token_count / 5) # Adjust figsize for single plot
+    base_width = max(12, token_count / 4)
+    base_height = max(12, token_count / 5)
 
-    # --- Create output directory if it doesn't exist ---
+    if top_n is not None and normalize_rows:
+        print("Warning: Both top_n and normalize_rows are specified. Prioritizing top_n.")
+        normalize_rows = False
+
     if not os.path.exists(output_dir):
         try:
             os.makedirs(output_dir)
             print(f"Created output directory: {output_dir}")
         except OSError as e:
             print(f"Error creating directory {output_dir}: {e}")
-            return # Exit if directory cannot be created
-    # --- End directory creation ---
-
-    clip_verts = [(0, 0), (token_count, token_count), (0, token_count), (0, 0)]
+            return
 
     for layer_idx in layers_to_show:
         if not (0 <= layer_idx < num_layers):
              print(f"Warning: Layer index {layer_idx} invalid (max is {num_layers-1}). Skipping.")
              continue
+
+        layer_attentions = attentions[layer_idx]
 
         for head_idx in heads_to_show:
             if not (0 <= head_idx < num_heads):
@@ -219,46 +218,134 @@ def plot_individual_attention_maps(
 
             print(f"Generating plot for Layer {layer_idx}, Head {head_idx}...")
 
-            # --- Create a NEW figure and axes for EACH plot ---
             fig, ax = plt.subplots(figsize=(base_width, base_height))
-            # --- End new figure ---
+            ax.set_facecolor('white') # Set background
 
-            clip_polygon = Polygon(clip_verts, transform=ax.transData, facecolor='none', edgecolor='none')
-            attn_weights = attentions[layer_idx][0, head_idx].detach().cpu().numpy()
-            attn_weights_plot = attn_weights[:token_count, :token_count]
-            mask_upper = np.triu(np.ones_like(attn_weights_plot, dtype=bool), k=1)
-
-            # --- Z-order definitions ---
+            # --- Z-order Definitions (Adjusted) ---
+            # Ensure mask is above spans but below grid/lines/text
             heatmap_zorder = 0.5
-            grid_zorder = 1.0      # Grid lines on top of heatmap colors
-            span_zorder = 1.5      # Shaded spans on top of grid
-            number_zorder = 2.0    # Numbers on top of spans
-            line_zorder = 2.5      # Red lines for tags
-            answer_line_zorder = 2.6 # Answer line slightly above tag lines
-            # --- Plot heatmap WITHOUT internal grid lines ---
+            span_zorder = 1.0          # Spans drawn above heatmap
+            upper_mask_zorder = 1.5    # White mask above spans
+            grid_zorder = 2.0          # Grid above mask
+            number_zorder = 3.0        # Numbers above grid
+            line_zorder = 4.0          # Tag lines above numbers
+            answer_line_zorder = 4.1   # Answer line above tag lines
+
+            # Extract and prepare attention weights (same logic as before)
+            attn_weights = layer_attentions[0, head_idx, 1:, 1:].detach().cpu().numpy()
+            attn_weights_plot_orig = attn_weights[:token_count, :token_count]
+
+            data_to_plot = np.copy(attn_weights_plot_orig)
+            plot_title_suffix = "(Raw Attention)"
+            mode_suffix = "_raw"
+
+            # --- Top-N / Normalization Logic (Keep as is) ---
+            if top_n is not None and top_n > 0:
+                # [ ... Same top_n logic ... ]
+                print(f"   Selecting Top {top_n} attention values per row...")
+                top_n_data = np.full_like(attn_weights_plot_orig, np.nan)
+                for i in range(token_count):
+                    row_slice = attn_weights_plot_orig[i, :i+1]
+                    num_valid_attentions = i + 1
+                    current_top_n = min(top_n, num_valid_attentions)
+                    if current_top_n > 0:
+                         top_indices_in_slice = np.argsort(row_slice)[-current_top_n:]
+                         top_n_data[i, top_indices_in_slice] = row_slice[top_indices_in_slice]
+                data_to_plot = top_n_data
+                plot_title_suffix = f"(Top {top_n} Attention)"
+                mode_suffix = f"_top{top_n}"
+
+            elif normalize_rows:
+                # [ ... Same normalize_rows logic ... ]
+                print("   Applying row-wise normalization...")
+                attn_weights_normalized = np.copy(attn_weights_plot_orig)
+                epsilon = 1e-9
+                for i in range(token_count):
+                    row_slice = attn_weights_normalized[i, :i+1]
+                    max_val = np.max(row_slice) if len(row_slice) > 0 else 0
+                    if max_val > epsilon:
+                         attn_weights_normalized[i, :i+1] = row_slice / max_val
+                    else:
+                         attn_weights_normalized[i, :i+1] = 0.0
+                    if i + 1 < token_count:
+                        attn_weights_normalized[i, i+1:] = np.nan
+                data_to_plot = np.tril(attn_weights_normalized, k=0)
+                data_to_plot[np.triu_indices_from(data_to_plot, k=1)] = np.nan
+                plot_title_suffix = "(Row Normalized)"
+                mode_suffix = "_normalized"
+
+            else:
+                 # Raw attention: Ensure upper triangle is NaN for masking in heatmap
+                 data_to_plot = np.tril(attn_weights_plot_orig, k=0)
+                 data_to_plot[np.triu_indices_from(data_to_plot, k=1)] = np.nan
+
+            plot_title = f"Layer {layer_idx}, Head {head_idx} {plot_title_suffix}"
+
+            # --- Plot Heatmap ---
+            # NaN values are masked by seaborn automatically
             sns.heatmap(
-                attn_weights_plot,
-                cmap="Blues",
+                data_to_plot,
+                cmap=cmap,
                 xticklabels=False,
                 yticklabels=False,
-                cbar=False,
-                mask=mask_upper,
+                cbar=True,
+                mask=np.isnan(data_to_plot),
                 ax=ax,
                 square=True,
-                linewidths=0,     # <-- Set linewidths to 0
-                linecolor='none', # <-- Set linecolor to none
-                zorder=heatmap_zorder # Set base zorder for heatmap
+                linewidths=0,
+                linecolor='none',
+                zorder=heatmap_zorder,
             )
 
-            # --- Manually draw grid lines ONLY for the lower triangle ---
+            # --- Apply Tag Highlighting (No Clipping Here) ---
+            # Draw the shaded spans *before* the white mask is applied
+            if tag_indices:
+                for tag_name, loc in tag_indices.items():
+                    start_idx_tag = loc['tag_start']
+                    end_idx_tag = loc['tag_end']
+
+                    if 0 <= start_idx_tag < end_idx_tag <= token_count:
+                        # Draw full spans, they will be covered by the white mask later
+                        ax.axvspan(start_idx_tag, end_idx_tag, color=shade_color, alpha=shade_alpha, zorder=span_zorder, lw=0, clip_on=True)
+                        ax.axhspan(start_idx_tag, end_idx_tag, color=shade_color, alpha=shade_alpha, zorder=span_zorder, lw=0, clip_on=True)
+                        # Note: Boundary lines and numbers are drawn *later* with higher z-order
+            diag_offset = 0.00 
+            # Vertices: (Top-left near diagonal), (Top-right), (Bottom-right near diagonal)
+            top_y_margin = -1.50 # No need to pull down from top? Labels are below.
+            right_x_margin = -1.5 # Pull left from right edge
+
+            upper_triangle_verts = [
+                # Start near diagonal, just right of y-axis, at the top edge
+                (diag_offset, top_y_margin),
+
+                # Go across near top edge, but stop short of the right axis
+                (token_count - right_x_margin, top_y_margin),
+
+                # Go down the right side (pulled inwards), stopping just above the diagonal
+                (token_count - right_x_margin, token_count - right_x_margin - diag_offset)
+            ]
+            # Create the polygon patch
+            upper_mask_polygon = Polygon(
+                upper_triangle_verts,
+                facecolor='white',      # Use white to mask
+                edgecolor='none',       # No border for the mask itself
+                closed=True,
+                zorder=upper_mask_zorder # Ensure it's above spans, below grid/lines
+            )
+            # Add the mask to the plot
+            ax.add_patch(upper_mask_polygon)
+            # --- ^ ^ ^ End White Mask Addition ^ ^ ^ ---
+
+
+            # --- Draw grid lines for lower triangle ---
+            # Make sure zorder is higher than the mask
             for k in range(1, token_count):
-                # Vertical line segments (from x=k, starting at y=k-1 down to y=token_count)
+                # Vertical lines (only below or on diagonal)
                 ax.plot([k, k], [k - 1, token_count], color=grid_line_color, linewidth=grid_line_width, zorder=grid_zorder)
-                # Horizontal line segments (from y=k, starting at x=0 across to x=k)
-                ax.plot([0, k], [k, k], color=grid_line_color, linewidth=grid_line_width, zorder=grid_zorder)
-            # --- End manual grid drawing ---
+                # Horizontal lines (only left of or on diagonal)
+                ax.plot([0, k + 1], [k, k], color=grid_line_color, linewidth=grid_line_width, zorder=grid_zorder) # Extend slightly to ensure full coverage left-to-diag
 
-
+            # --- Set Ticks and Labels (Keep as is) ---
             tick_positions = np.arange(token_count) + 0.5
             ax.set_xticks(tick_positions)
             ax.set_yticks(tick_positions)
@@ -266,106 +353,94 @@ def plot_individual_attention_maps(
             ax.set_xticklabels(tokens, rotation=90, fontsize=fontsize, ha='center')
             ax.set_yticklabels(tokens, rotation=0, fontsize=fontsize, va='center')
 
-            # --- Apply Tag Highlighting (using updated z-orders) ---
+            # --- Add Fact Numbers and Boundary Lines (After Mask) ---
             if tag_indices:
                 for tag_name, loc in tag_indices.items():
                     start_idx_tag = loc['tag_start']
                     end_idx_tag = loc['tag_end']
 
-                    if start_idx_tag >= 0 and end_idx_tag <= token_count and start_idx_tag < end_idx_tag:
+                    if 0 <= start_idx_tag < end_idx_tag <= token_count:
                         match = re.search(r'fact(\d+)', tag_name)
                         fact_num_str = match.group(1) if match else None
 
-                        # Shaded spans
-                        span_v = ax.axvspan(start_idx_tag, end_idx_tag, color=shade_color, alpha=shade_alpha, zorder=span_zorder, lw=0)
-                        span_h = ax.axhspan(start_idx_tag, end_idx_tag, color=shade_color, alpha=shade_alpha, zorder=span_zorder, lw=0)
-                        span_v.set_clip_path(clip_polygon)
-                        span_h.set_clip_path(clip_polygon)
-
-                        # Fact numbers
+                        # Fact numbers (Only draw if center is in lower triangle/diagonal)
                         if fact_num_str:
                             center_x = (start_idx_tag + end_idx_tag) / 2.0
                             center_y = (start_idx_tag + end_idx_tag) / 2.0
-                            dynamic_fontsize = max(5, min(number_fontsize, (end_idx_tag - start_idx_tag) * 1.5))
+                            # Condition: y >= x for lower triangle/diagonal (remember y-axis inverted)
+                            # Use a small tolerance if needed: center_y >= center_x - 0.01
+                            if center_y >= center_x:
+                                dynamic_fontsize = max(5, min(number_fontsize, (end_idx_tag - start_idx_tag) * 1.5))
+                                ax.text(center_x, center_y, fact_num_str,
+                                        ha='center', va='center',
+                                        fontsize=dynamic_fontsize + 20,
+                                        color=number_color,
+                                        alpha=number_alpha,
+                                        zorder=number_zorder, # Ensure above mask & grid
+                                        clip_on=True)
 
-                            ax.text(center_x, center_y, fact_num_str,
-                                    ha='center', va='center',
-                                    fontsize=dynamic_fontsize+20, # Increased size slightly
-                                    color=number_color,
-                                    alpha=number_alpha,
-                                    zorder=number_zorder, # Ensure numbers are above spans/grid
-                                    clip_on=True) # Clip numbers to axes bounds
+                        # Boundary lines (drawn over mask/grid)
+                        ax.plot([start_idx_tag, start_idx_tag], [max(start_idx_tag, 0), token_count], color=line_color, linestyle=line_style, linewidth=line_width, zorder=line_zorder, clip_on=True)
+                        ax.plot([end_idx_tag, end_idx_tag], [max(end_idx_tag, 0), token_count], color=line_color, linestyle=line_style, linewidth=line_width, zorder=line_zorder, clip_on=True)
+                        ax.plot([0, min(start_idx_tag, token_count)], [start_idx_tag, start_idx_tag], color=line_color, linestyle=line_style, linewidth=line_width, zorder=line_zorder, clip_on=True)
+                        ax.plot([0, min(end_idx_tag, token_count)], [end_idx_tag, end_idx_tag], color=line_color, linestyle=line_style, linewidth=line_width, zorder=line_zorder, clip_on=True)
+            # --- End Fact Numbers/Lines ---
 
-                        # Red boundary lines
-                        # Vertical lines (start at diagonal, go down)
-                        ax.plot([start_idx_tag, start_idx_tag], [start_idx_tag, token_count], color=line_color, linestyle=line_style, linewidth=line_width, zorder=line_zorder) # Vertical start
-                        ax.plot([end_idx_tag, end_idx_tag], [end_idx_tag, token_count], color=line_color, linestyle=line_style, linewidth=line_width, zorder=line_zorder)     # Vertical end
-                        # Horizontal lines (start at left, go to diagonal)
-                        ax.plot([0, start_idx_tag], [start_idx_tag, start_idx_tag], color=line_color, linestyle=line_style, linewidth=line_width, zorder=line_zorder) # Horizontal start
-                        ax.plot([0, end_idx_tag], [end_idx_tag, end_idx_tag], color=line_color, linestyle=line_style, linewidth=line_width, zorder=line_zorder)     # Horizontal end
-                    else:
-                        # Warning printed only once per invalid tag during finding, no need here unless debugging
-                        pass
-            # --- End Tag Highlighting ---
-
-            # --- Add Solid Black Line after 'Answer' token ---
+            # Add Solid Line after 'Answer' token (drawn over mask/grid)
             if answer_idx != -1:
-                line_pos = answer_idx + 1 # The boundary is *after* the token index
-                if 0 < line_pos < token_count: # Ensure the line position is valid
-                    # Vertical line: starts at x=line_pos, from y=line_pos (diagonal) down to y=token_count (bottom)
+                line_pos = answer_idx + 1
+                if 0 < line_pos < token_count:
                     ax.plot([line_pos, line_pos], [line_pos, token_count],
-                            color=answer_line_color,
-                            linestyle=answer_line_style,
-                            linewidth=answer_line_width,
-                            zorder=answer_line_zorder) # Ensure it's drawn on top
-
-                    # Horizontal line: starts at y=line_pos, from x=0 (left) across to x=line_pos (diagonal)
+                            color=answer_line_color, linestyle=answer_line_style, linewidth=answer_line_width,
+                            zorder=answer_line_zorder, clip_on=True)
                     ax.plot([0, line_pos], [line_pos, line_pos],
-                            color=answer_line_color,
-                            linestyle=answer_line_style,
-                            linewidth=answer_line_width,
-                            zorder=answer_line_zorder) # Ensure it's drawn on top
-            # --- End Answer Line ---
+                            color=answer_line_color, linestyle=answer_line_style, linewidth=answer_line_width,
+                            zorder=answer_line_zorder, clip_on=True)
 
-
+            # Final Plot Adjustments (keep as is)
             ax.set_xlim(0, token_count)
-            ax.set_ylim(token_count, 0)
-            ax.set_title(f"Layer {layer_idx}, Head {head_idx}", fontsize=10)
+            ax.set_ylim(token_count, 0) # Inverted y-axis
+            ax.set_title(plot_title, fontsize=10)
+            plt.tight_layout()
 
-            # --- Construct unique filename and save ---
-            filename = os.path.join(output_dir, f"{base_filename}_layer_{layer_idx}_head_{head_idx}.png")
+            # Construct unique filename and save (keep as is)
+            filename = os.path.join(output_dir, f"{base_filename}_layer_{layer_idx}_head_{head_idx}{mode_suffix}.png")
             try:
-                plt.savefig(filename, dpi=300, bbox_inches='tight')
+                plt.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
                 print(f"   Saved plot to {filename}")
             except Exception as e:
                 print(f"   Error saving plot {filename}: {e}")
-            # --- End saving ---
 
-            # --- Close the figure to free memory ---
             plt.close(fig)
-            # --- End closing ---
 
     print("\nFinished generating individual attention map images.")
 
 
-# --- Run Visualization (Saving Individual Files) ---
-num_model_layers = model.config.num_hidden_layers
-num_model_heads = model.config.num_attention_heads
+# --- Run Visualization (Same parameters as before) ---
+N_TOP_VALUES = 5
+SELECTED_LAYERS = [0]
+SELECTED_HEADS = [0]
+output_directory_top_n = f"hot/individual_maps_top{N_TOP_VALUES}"
 
 plot_individual_attention_maps(
     tag_locations,
-    answer_idx=answer_token_index, # Pass the found index
-    layers_to_show=[0],     # Example: Layers 0
-    heads_to_show=[8,9,10,11,12,13,14,15,16],      # Example: Head 3
-    output_dir="hot/individual_maps", # Save to a new subdirectory
-    base_filename="llama3.1_8b_attention", # Custom base name
+    answer_idx=answer_token_index,
+    layers_to_show=SELECTED_LAYERS,
+    heads_to_show=SELECTED_HEADS,
+    output_dir=output_directory_top_n,
+    base_filename=f"{model_name.split('/')[-1]}_attention",
+    top_n=N_TOP_VALUES,
+    normalize_rows=False,
+    cmap="Blues",
     shade_color='grey',
-    shade_alpha=0.15,
-    number_fontsize=30,
-    number_alpha=0.4,
-    number_color='red',
-    grid_line_color='black', # Explicitly define grid color
-    grid_line_width=0.15,    # Explicitly define grid width
-    answer_line_color='black', # Make answer line black
-    answer_line_width=2.0      # Make answer line slightly thicker
+    shade_alpha=0.15, # Keep alpha relatively low
+    number_fontsize=25,
+    number_alpha=0.5,
+    number_color='blue',
+    grid_line_color='grey',
+    grid_line_width=0.1,
+    answer_line_color='green',
+    answer_line_width=1.5,
+    line_color='purple',
+    line_width=1.0
 )
