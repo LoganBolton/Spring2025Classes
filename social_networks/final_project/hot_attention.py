@@ -39,10 +39,13 @@ except Exception as e:
         attn_implementation="eager" # Ensure we get standard attention tensors
     )
 
-# Step 2: Prepare input text
-text = """**Reformatted Question:** A machine is set up in such a way that it will <fact1>short circuit if both the black wire and the red wire touch the battery at the same time</fact1>. The machine will <fact2>not short circuit if just one of these wires touches the battery</fact2>. The black wire is designated as the one that is supposed to touch the battery, while the red wire is supposed to remain in some other part of the machine. One day, the <fact3>black wire and the red wire both end up touching the battery at the same time</fact3>. There is a short circuit. Did the <fact4>black wire cause the short circuit</fact4>? Options: - Yes - No
+# text = """Question: For every 12 cans you recycle, you receive $0.50, and for every 5 kilograms of newspapers, you receive $1.50. If your family collected 144 cans and 20 kilograms of newspapers, how much money would you receive?
+# Answer_Reasoning: There are 144/12 = 12 sets of 12 cans that the family collected.\nSo, the family would receive $0.50 x 12 = 6 for the cans.\nThere are 20/5 = 4 sets of 5 kilograms of newspapers that the family collected.\nSo, the family would receive $1.50 x 4 = 6 for the newspapers.\nTherefore, the family would receive a total of $6 + $6 = 12.
+# Final_Answer: {"""
 
-**Answer:** The question states that the machine <fact1>short circuits only when both the black and red wires touch the battery simultaneously</fact1>. It also specifies that <fact2>touching the battery with only one wire will not cause a short circuit</fact2>.  While the <fact3>black wire did touch the battery</fact3>, it was the <fact3>simultaneous contact of both wires</fact3> that triggered the short circuit. Therefore, the <fact4>black wire alone did not cause the short circuit</fact4>. The answer is {No}."""
+text = """Question: <fact1>For every 12 cans you recycle</fact1>, <fact2>you receive $0.50</fact2>, <fact3>and for every 5 kilograms of newspapers</fact3>, <fact4>you receive $1.50</fact4>. <fact5>If your family collected 144 cans and 20 kilograms of newspapers</fact5>, <fact6>how much money would you receive</fact6>?
+Answer_Reasoning: There are <fact5>144</fact5>/<fact1>12</fact1> = 12 sets of 12 cans that the family collected.\nSo, the family would receive <fact2>$0.50</fact2> x <fact1>12</fact1> = $6 for the cans.\nThere are <fact5>20</fact5>/<fact3>5</fact3> = 4 sets of 5 kilograms of newspapers that the family collected.\nSo, the family would receive <fact4>$1.50</fact4> x 4 = 6 for the newspapers.\nTherefore, the family would receive a total of $6 + $6 = 12.
+Final_Answer: {"""
 
 inputs = tokenizer(text, return_tensors="pt")
 base_tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
@@ -420,7 +423,7 @@ N_TOP_VALUES = 5
 SELECTED_LAYERS = [0]
 # SELECTED_HEADS = [0]
 SELECTED_HEADS = [i for i in range(32)]
-output_directory_top_n = f"hot/individual_maps_top{N_TOP_VALUES}"
+output_directory_top_n = f"cot/individual_maps_top{N_TOP_VALUES}"
 
 plot_individual_attention_maps(
     tag_locations,

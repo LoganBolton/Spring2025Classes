@@ -197,7 +197,7 @@ def HMM_posterior(df):
             alpha[time, state_idx] = max_val + np.log(sum_exp)
     
     # backward pass
-    # init to 100% == log(1) == log(0)
+    # init to 100% == log(1) == 0
     beta = np.full((len(df), len(states)), 0)
     
     for time in range(len(df)-2, -1, -1):
