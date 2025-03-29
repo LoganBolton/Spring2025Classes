@@ -5,11 +5,12 @@ author: "Logan Bolton"
 date: "2025-02-23"
 ---
 
-_Acknowledgement:_ This code was created through the repurposing of code found in the lecture notes and through collaboration with Claude 3.5 Sonnet and o3-mini. These AI tools were very helpful for me while fixing errors and determining the correct syntax to plot graphs.
+_Acknowledgement:_ This code was created through the repurposing of code found in the lecture notes and through collaboration with ChatGPT-4o by OpenAI. AI tools were very helpful for me while fixing errors and determining the correct syntax to plot graphs.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library('igraph')
+library(poweRlaw)
 
 ```
 
@@ -26,40 +27,132 @@ dim(affiliations96)
 
 # 1 - 1996 Dataset
 ## a - Which student clubs serve to integrate the school and which are more peripheral?
+```{r}
+G96 <- graph_from_incidence_matrix(as.matrix(affiliations96))
+# Split nodes into types
+V(G96)$type # TRUE = club, FALSE = student
+clubs <- V(G96)[V(G96)$type == TRUE]
 
+# Degree of each club (number of students in each club)
+club_degrees <- degree(G96, v = clubs)
+
+# Visualize distribution
+hist(club_degrees, main = "Club Degree Distribution", xlab = "Number of Members")
+
+# Identify top & bottom
+head(sort(club_degrees, decreasing = TRUE), 10)  # Most connected (integrating)
+head(sort(club_degrees, decreasing = FALSE), 10) # Least connected (peripheral)
+
+```
 ## b - Which student clubs tend to share members at high rates?
 
+```{r}
+projections <- bipartite_projection(G96)
+club_graph <- projections$proj2  # This is the club-club graph
+
+# Weight = number of shared members
+E(club_graph)$weight
+
+# Top pairs with highest shared members
+top_pairs <- sort(E(club_graph)$weight, decreasing = TRUE)
+head(top_pairs, 10)
+```
 ## c - What is the shared feature, or theme, that brings these clubs together in a cluster?
 
 
 ```{r}
+club_comm <- cluster_louvain(club_graph)
+plot(club_comm, club_graph, vertex.label = NA, main = "Communities of Clubs")
 
+# View membership
+membership(club_comm)
 ```
 
 # 2 - 1997 Dataset
 
 ## a - What is the order, size, and density of G?
+```{r}
+G <- graph_from_incidence_matrix(as.matrix(affiliations97))
+
+order_G <- gorder(G)
+size_G <- gsize(G)
+density_G <- edge_density(G)
+
+cat("Order (number of vertices):", order_G, "\n")
+cat("Size (number of edges):", size_G, "\n")
+cat("Density:", density_G, "\n")
+```
 
 ## b - Is the network G connected? If not, what fraction of vertices belong to the largest connected component? If the network is not connected, consider only the largest component H for the remaining questions.
+```{r}
+is_connected(G)
+cat("The graph is NOT connected\n\n")
+
+comp <- components(G)
+
+# Size of largest component
+largest_comp_size <- max(comp$csize)
+fraction_largest <- largest_comp_size / gorder(G)
+
+# Create subgraph H
+H <- induced_subgraph(G, which(comp$membership == which.max(comp$csize)))
+
+cat("Percent of vertices belonging to largest component: ", fraction_largest, "\n")
+```
 
 ## c - What is the average path length of H?
+```{r}
+average_path_length_H <- average.path.length(H, directed = FALSE)
+cat("Average path length: ", average_path_length_H)
+```
 
 ## d - Is H scale-free? Provide statistical evidence (e.g., by examining the degree distribution and fitting a power-law distribution)
 
+```{r}
+deg <- degree(H)
+hist(deg, breaks=50, main="Degree Distribution", xlab="Degree")
+
+# Fit power law
+fit <- fit_power_law(deg)
+fit
+```
 ## e - What is the fraction of edges that are attached to the top 10% of high-degree vertices?
 
+```{r}
+m <- displ$new(deg)
+est <- estimate_xmin(m)
+m$setXmin(est)
+plot(m)
+lines(m, col="red")
+```
 ## f - What distributions do the following centrality measures follow:
 
-### Eigenvector centrality
+```{r}
+# Eigenvector
+eigen_centrality <- eigen_centrality(H)$vector
+hist(eigen_centrality, main="Eigenvector Centrality", xlab="Centrality")
 
-### Betweenness centrality
+# Betweenness
+betw <- betweenness(H)
+hist(betw, main="Betweenness Centrality", xlab="Betweenness")
 
-### Closeness centrality
+# Closeness
+closeness_centrality <- closeness(H)
+hist(closeness_centrality, main="Closeness Centrality", xlab="Closeness")
+
+```
 
 ## g - How does the clustering coefficient of vertices change with vertex degrees?
+# FIX THIS
+```{r}
+clustering <- transitivity(H, type = "local", isolates = "zero")
+plot(deg, clustering, xlab="Degree", ylab="Clustering Coefficient", main="Clustering vs Degree")
 
-
+```
 ## h - Does H exhibit assortative mixing in terms of vertex degrees? Provide the assortativity coefficient and interpret its value.
 ```{r}
+assortativity_degree <- assortativity_degree(H)
+assortativity_degree
+
 ```
 
