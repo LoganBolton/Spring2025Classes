@@ -27,25 +27,29 @@ dim(affiliations96)
 
 # 1 - 1996 Dataset
 ## a - Which student clubs serve to integrate the school and which are more peripheral?
+The most core clubs are the Spanish Club, the Pep Club and NHS. The Choir barbershop quartet (4 men), the Cross Country girls 8th grade team and the boys Swim & Dive Team are the most peripheral clubs.
 ```{r}
 G96 <- graph_from_incidence_matrix(as.matrix(affiliations96))
-# Split nodes into types
-V(G96)$type # TRUE = club, FALSE = student
+# Split nodes into types by rows versus columns
+# V(G96)$type # TRUE = club, FALSE = student,
 clubs <- V(G96)[V(G96)$type == TRUE]
 
-# Degree of each club (number of students in each club)
 club_degrees <- degree(G96, v = clubs)
-
-# Visualize distribution
-hist(club_degrees, main = "Club Degree Distribution", xlab = "Number of Members")
-
 # Identify top & bottom
-head(sort(club_degrees, decreasing = TRUE), 10)  # Most connected (integrating)
-head(sort(club_degrees, decreasing = FALSE), 10) # Least connected (peripheral)
+cat("top clubs\n")
+head(sort(club_degrees, decreasing = TRUE), 3)  
 
+cat("Peripheral clubs\n")
+head(sort(club_degrees, decreasing = FALSE), 3) 
 ```
 ## b - Which student clubs tend to share members at high rates?
 
+The following pairs of clubs share the most amount of members:
+
+- Pep Club & Spanish Club
+- Debate club & Forensics (National Forensics League)
+- Forensics club & Forensics (National Forensics League)
+  - "Forensics club" and "Forensics (National Forensics League)" are listed as separate clubs in the dataset, despite having similar names
 ```{r}
 projections <- bipartite_projection(G96)
 club_graph <- projections$proj2  # This is the club-club graph
@@ -54,18 +58,47 @@ club_graph <- projections$proj2  # This is the club-club graph
 E(club_graph)$weight
 
 # Top pairs with highest shared members
-top_pairs <- sort(E(club_graph)$weight, decreasing = TRUE)
-head(top_pairs, 10)
+top_pairs <- as_data_frame(club_graph, what = "edges")
+top_pairs <- top_pairs[order(-top_pairs$weight), ]
+head(top_pairs, 3)
 ```
 ## c - What is the shared feature, or theme, that brings these clubs together in a cluster?
 
+When analyzing the clusters based off the walktrap algorithm, the majority of the clubs in the clusters share the following common traits:
+
+- Cluster 1
+  - Girls 8th grade sports teams
+- Cluster 2
+  - High school boys sports teams
+- Cluster 3
+  - Boys 8th grade sports teams
+- Cluster 4
+  - Majority female academic clubs and girls sports
+- Cluster 5
+  - Academic organizations and girls sports
+- Cluster 6
+  - 9th grade girls sports
+- Cluster 7
+  - Music clubs
+  
+I tried several different clustering methods and the walktrap algorithm gave the most coherent clusters.
 
 ```{r}
-club_comm <- cluster_louvain(club_graph)
-plot(club_comm, club_graph, vertex.label = NA, main = "Communities of Clubs")
+# club_comm <- cluster_louvain(club_graph)
+# club_comm <- cluster_edge_betweenness(club_graph)
+club_comm <- cluster_walktrap(club_graph)
 
-# View membership
-membership(club_comm)
+club_membership <- membership(club_comm)
+club_names <- names(club_membership)
+
+# Combine club names and cluster numbers
+club_clusters <- data.frame(
+  Club = club_names,
+  Cluster = club_membership
+)
+
+# View the clubs in each cluster
+split(club_clusters$Club, club_clusters$Cluster)
 ```
 
 # 2 - 1997 Dataset
