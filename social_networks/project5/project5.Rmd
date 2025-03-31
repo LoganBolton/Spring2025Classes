@@ -2,16 +2,16 @@
 title: "Project 5"
 output: pdf_document
 author: "Logan Bolton"
-date: "2025-02-23"
+date: "2025-03-30"
 ---
 
-_Acknowledgement:_ This code was created through the repurposing of code found in the lecture notes and through collaboration with ChatGPT-4o by OpenAI. AI tools were very helpful for me while fixing errors and determining the correct syntax to plot graphs.
+_Acknowledgement:_ This code was created through the repurposing of code found in the lecture notes and through collaboration with ChatGPT-4o and Gemini 2.5 Pro. AI tools were very helpful for me while fixing errors and determining the correct syntax to plot graphs.
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup}
+# knitr::opts_chunk$set(echo = TRUE)
 library('igraph')
 library(poweRlaw)
-
+library(dplyr)
 ```
 
 
@@ -58,7 +58,7 @@ club_graph <- projections$proj2  # This is the club-club graph
 E(club_graph)$weight
 
 # Top pairs with highest shared members
-top_pairs <- as_data_frame(club_graph, what = "edges")
+top_pairs <- get.data.frame(club_graph, what = "edges")
 top_pairs <- top_pairs[order(-top_pairs$weight), ]
 head(top_pairs, 3)
 ```
@@ -141,51 +141,199 @@ cat("Average path length: ", average_path_length_H)
 
 ## d - Is H scale-free? Provide statistical evidence (e.g., by examining the degree distribution and fitting a power-law distribution)
 
-```{r}
-deg <- degree(H)
-hist(deg, breaks=50, main="Degree Distribution", xlab="Degree")
+Yes, the subgraph H appears to be scale-free because the degree distribution follows a power-law for degrees >= 4. The scaling exponent is 2.46, and the high bootstrap p-value of 0.53 suggests a good fit to the power-law model.
 
-# Fit power law
-fit <- fit_power_law(deg)
-fit
+```{r}
+degrees_H <- degree(H)
+
+## Logarithmic binning and log-log plot
+log_bins <- function(degrees, alpha = 2) {
+  min_deg <- min(degrees[degrees > 0])
+  max_deg <- max(degrees)
+  bin_edges <- c()
+  current_edge <- min_deg
+  while (current_edge < max_deg) {
+    bin_edges <- c(bin_edges, current_edge)
+    current_edge <- current_edge * alpha
+  }
+  bin_edges <- c(bin_edges, max_deg)
+  return(bin_edges)
+}
+
+# Generate log bins and bin the degrees
+bin_edges <- log_bins(degrees_H, alpha = 2)
+binned_degrees <- cut(degrees_H, breaks = bin_edges, include.lowest = TRUE)
+binned_counts <- table(binned_degrees)
+bin_widths <- diff(bin_edges)
+normalized_counts <- as.numeric(binned_counts) / bin_widths
+bin_centers <- sqrt(bin_edges[-length(bin_edges)] * bin_edges[-1])
+
+# Log-log plot
+log_bin_centers <- log10(bin_centers)
+log_normalized_counts <- log10(normalized_counts / length(degrees_H))
+
+# Plot
+barplot(log_normalized_counts,
+        names.arg = round(log_bin_centers, 2),
+        xlab = "log10(Degree)",
+        ylab = "log10(Fraction of Nodes)",
+        main = "Log-Log Degree Distribution (H)",
+        col = "skyblue",
+        border = "black")
+grid()
+
+## Power-law fitting using poweRlaw
+m_pl <- displ$new(degrees_H)
+est_xmin <- estimate_xmin(m_pl)
+m_pl$setXmin(est_xmin)
+est_pars <- estimate_pars(m_pl)
+m_pl$setPars(est_pars)
+
+# Extract alpha (scaling exponent) and k_min
+alpha <- m_pl$pars
+k_min <- m_pl$xmin
+cat("Estimated scaling exponent (alpha):", alpha, "\n")
+cat("Estimated minimum degree (k_min):", k_min, "\n")
+
+## Goodness-of-fit via bootstrapping
+set.seed(123)  # for reproducibility
+bs <- bootstrap(m_pl, no_of_sims = 100)
+
+gof_obs <- bs$gof
+
+# Extract GOF values from bootstrapped samples
+gof_bootstrap <- bs$bootstraps$gof
+
+# Calculate p-value: fraction of bootstrap GOFs > observed GOF
+p_val <- mean(gof_bootstrap > gof_obs)
+
+# Display
+cat("Bootstrap p-value:", p_val, "\n")
+if (p_val > 0.1) {
+  cat("The power-law distribution is a good fit (p > 0.1)\n")
+} else {
+  cat("The power-law distribution is NOT a good fit (p <= 0.1)\n")
+}
+
 ```
 ## e - What is the fraction of edges that are attached to the top 10% of high-degree vertices?
 
+Fraction of edges attached to the top 10% high-degree vertices: 0.9613783 
+
 ```{r}
-m <- displ$new(deg)
-est <- estimate_xmin(m)
-m$setXmin(est)
-plot(m)
-lines(m, col="red")
+deg_H <- degree(H)
+top_10_percent_count <- ceiling(0.10 * length(deg_H))
+
+top_vertices <- names(sort(deg_H, decreasing = TRUE))[1:top_10_percent_count]
+
+# Count total number of edges in H
+total_edges <- gsize(H)
+
+top_edges <- unique(unlist(incident_edges(H, top_vertices)))
+fraction_top_edges <- length(top_edges) / total_edges
+
+cat("Fraction of edges attached to the top 10% high-degree vertices:", fraction_top_edges, "\n")
 ```
 ## f - What distributions do the following centrality measures follow:
 
+### Eigenvector and Betweenness
+When analyzed on a log-log scale, both measure show a similar pattern of gradually curving downwards and then decreasing at a somewhat similar rate. This type of trend is indicative of a powerlaw distribution. 
+
+### Closeness
+The closeness measure does not have a long tail in its distribution and it is not monotonically decreasing. Therfore, this centrality measure does not show a power-law distribution. 
 ```{r}
-# Eigenvector
-eigen_centrality <- eigen_centrality(H)$vector
-hist(eigen_centrality, main="Eigenvector Centrality", xlab="Centrality")
+# Calculate centrality measures
+eigen_H <- eigen_centrality(H)$vector
+betweenness_H <- betweenness(H, normalized = TRUE)
+closeness_H <- closeness(H) 
 
-# Betweenness
-betw <- betweenness(H)
-hist(betw, main="Betweenness Centrality", xlab="Betweenness")
+### ---- 1. Eigenvector Centrality ---- ###
+# Sort and compute cumulative fraction
+sorted_eigen <- sort(eigen_H, decreasing = TRUE)
+cumulative_eigen_frac <- (1:length(sorted_eigen)) / length(sorted_eigen)
 
-# Closeness
-closeness_centrality <- closeness(H)
-hist(closeness_centrality, main="Closeness Centrality", xlab="Closeness")
+# Open new plot
+par(mar = c(4, 4, 3, 2))
 
+plot(sorted_eigen, cumulative_eigen_frac, log = "xy", type = "l", lwd = 2,
+     xlab = "Eigenvector Centrality (log)", ylab = "Cumulative Fraction P(X>=x) (log)",
+     main = "Eigenvector Centrality (H)")
+grid()
+```
+``` {r}
+### ---- 2. Betweenness Centrality ---- ###
+sorted_betweenness <- sort(betweenness_H, decreasing = TRUE)
+valid_betweenness_indices <- which(sorted_betweenness > 0)
+sorted_betweenness_nonzero <- sorted_betweenness[valid_betweenness_indices]
+cumulative_betweenness_frac_nonzero <- valid_betweenness_indices / length(betweenness_H)
+
+par(mar = c(4, 4, 3, 2))
+
+plot(sorted_betweenness_nonzero, cumulative_betweenness_frac_nonzero,
+     log = "xy", type = "l", lwd = 2,
+     xlab = "Betweenness Centrality (log)", ylab = "Cumulative Fraction P(X>=x) (log)",
+     main = "Betweenness Centrality (H)")
+grid()
+```
+
+```{r}
+### ---- 3. Closeness Centrality ---- ###
+hist_data_closeness <- hist(closeness_H, breaks = 30, plot = FALSE)
+fraction_vertices_closeness <- hist_data_closeness$counts / length(closeness_H)
+
+plot(hist_data_closeness$mids, fraction_vertices_closeness, type = "h", lwd = 5,
+     xlab = "Closeness Centrality", ylab = "Fraction of Vertices",
+     main = "Closeness Centrality (H)")
+grid()
 ```
 
 ## g - How does the clustering coefficient of vertices change with vertex degrees?
-# FIX THIS
+The vertices with low degrees have high clustering coefficients. This makes sense as some clubs are very tight knit. We would expect that every student in the barbershop quartet should know each other. Similarly for extremely large clubs, it is unlikely that all the students know each other.
 ```{r}
-clustering <- transitivity(H, type = "local", isolates = "zero")
-plot(deg, clustering, xlab="Degree", ylab="Clustering Coefficient", main="Clustering vs Degree")
+V(H)$type <- V(G)$type[match(V(H)$name, V(G)$name)] # Assign type from original G
+projections_H <- bipartite_projection(H)
+student_graph_H <- projections_H$proj1 # Graph where nodes are students (type FALSE)
 
+# Calculate degrees for vertices in the student network
+deg_student_H <- degree(student_graph_H)
+local_cc_student_H <- transitivity(student_graph_H, type = "local")
+
+df_student_cc <- data.frame(
+  vertex_id = V(student_graph_H)$name,
+  degree = deg_student_H,
+  local_cc = local_cc_student_H
+)
+
+df_student_cc_valid <- df_student_cc[!is.na(df_student_cc$local_cc), ]
+
+avg_cc_by_degree_student <- df_student_cc_valid %>%
+  group_by(degree) %>%
+  summarise(
+    avg_cc = mean(local_cc, na.rm = TRUE), # Should not be needed if NAs are filtered
+    .groups = 'drop'
+  ) %>%
+  filter(degree > 0) # Ensure degree is positive
+
+
+plot_data_student_loglog <- avg_cc_by_degree_student %>%
+  filter(avg_cc > 0) # Only need to filter avg_cc > 0 now
+
+plot(plot_data_student_loglog$degree, plot_data_student_loglog$avg_cc, log = "xy",
+     xlab = "Student Degree (k) [log scale]",
+     ylab = "Average Clustering Coefficient C(k) [log scale]",
+     main = "Clustering Coefficient vs. Degree",
+     pch = 19,
+     col = "dodgerblue",
+     panel.first = grid(col = "gray", lty = "dotted")
+     )
 ```
-## h - Does H exhibit assortative mixing in terms of vertex degrees? Provide the assortativity coefficient and interpret its value.
-```{r}
-assortativity_degree <- assortativity_degree(H)
-assortativity_degree
 
+## h - Does H exhibit assortative mixing in terms of vertex degrees? Provide the assortativity coefficient and interpret its value.
+
+H does not exhibit assortative mixing. The negative coefficient (-0.3829303) indicates that nodes tend to connect to nodes with dissimilar degrees
+```{r}
+assortativity_coeff_H_student <- assortativity_degree(H, directed = FALSE)
+
+cat("Assortativity coefficient (degree) for H:", assortativity_coeff_H_student, "\n")
 ```
 
