@@ -1,3 +1,9 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+.env/
+ENV/
 social_networks/final_project/hot/individual_maps_top5/Llama-3.1-8B_attention_layer_0_head_0_top5.png
 social_networks/final_project/hot/individual_maps_top5/Llama-3.1-8B_attention_layer_0_head_10_top5.png
 social_networks/final_project/hot/individual_maps_top5/Llama-3.1-8B_attention_layer_0_head_11_top5.png
