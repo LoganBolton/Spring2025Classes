@@ -19,8 +19,8 @@ model = LlamaForCausalLM.from_pretrained(
 
 num_nodes = 10
 max_possible_connections = num_nodes*(num_nodes-1)
-P_CONNECTION = 0.50
-num_graphs = 1
+P_CONNECTION = 0.25
+num_graphs = 300
 metadata_path = 'attention_matrices/metadata.json'
 
 for z in range(num_graphs):
@@ -45,7 +45,7 @@ for z in range(num_graphs):
         continue
     else:
         prompt = prompt[0:-1] # get rid of last \n
-    print(prompt)
+    # print(prompt)
 
 
     inputs = tokenizer(prompt, return_tensors="pt")
@@ -64,15 +64,16 @@ for z in range(num_graphs):
     np.save(attention_file_path, avg_attention_matrix)
 
     # Confirm saving
-    print("Average attention matrix from layer 0 saved as 'avg_attention_matrix_layer0.npy'")
-    print("Matrix shape:", avg_attention_matrix.shape)
+    # print("Average attention matrix from layer 0 saved as 'avg_attention_matrix_layer0.npy'")
+    # print("Matrix shape:", avg_attention_matrix.shape)
 
     base_tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
-    print(base_tokens)
+    # print(base_tokens)
     
     metadata_entry = {
         "attention_matrix_path": attention_file_path,
-        "num_nodes": num_nodes,
+        "max_nodes": num_nodes,
+        "num_nodes": len(set(source+target)),
         "num_edges": len(source),
         "connection_probability": P_CONNECTION,
         "layer": '0',
