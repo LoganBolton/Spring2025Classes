@@ -17,12 +17,20 @@ model = LlamaForCausalLM.from_pretrained(
 )
 
 # Step 2: Prepare input text
-# text = """Old scientist who discovered the rare element received the prestigious award"""
-text = """A -> B
-A -> C
-C -> B
-D -> B
-E -> D"""
+# text = """A -> B
+# A -> C
+# C -> B
+# D -> B
+# E -> D"""
+# text = """A to B
+# A to C
+# C to B
+# D to B
+# E to D"""
+text = """A: B, C, D, E
+C: B
+D: B
+E: D"""
 inputs = tokenizer(text, return_tensors="pt")
 base_tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
 
@@ -52,33 +60,13 @@ print(f"Tokens: {tokens}")
 
 # Optional: To visualize multiple heads from different layers
 def plot_multiple_heads_and_layers(
-    layers_to_show=[0, 7, 15], 
-    heads_to_show=[0,3,7,8,9,10,11,12,13,14,15]):
-    """
-    Create a grid where rows are different layers and columns are different heads
-    """
+    layers_to_show=[0], 
+    heads_to_show=[0,3,12]):
     rows = len(layers_to_show)
     cols = len(heads_to_show)
     
     plt.figure(figsize=(cols * 5, rows * 4))
     highlight_positions = []
-    # word_pairs = {'old': 'scientist', 'rare': 'element', 'prestigious': 'award'}
-    # for word_pair in word_pairs:
-    #     w1 = word_pair
-    #     w2 = word_pairs[word_pair]
-
-    #     for i in range(len(tokens)):
-    #         t1 = tokens[i].lower().strip()
-            
-    #         for j in range(len(tokens)):
-    #             t2 = tokens[j].lower().strip()
-                
-    #             # print(t1, t2, w1, w2)
-    #             if t1 == w1 and t2 == w2:
-    #                 # highlight_positions.append((i, j))
-    #                 highlight_positions.append((j, i))
-    # print(highlight_positions)
-
     
     for i, layer_idx in enumerate(layers_to_show):
         for j, head_idx in enumerate(heads_to_show):
@@ -100,7 +88,6 @@ def plot_multiple_heads_and_layers(
                 mask=mask_upper_triangular,
             )
         
-
             # Add black rectangles around the cells you want to highlight
             for pos in highlight_positions:
                 row, col = pos
@@ -112,9 +99,10 @@ def plot_multiple_heads_and_layers(
             
             if j == 0:  # Only add y-label on first column
                 plt.ylabel("Query Tokens")
+                plt.yticks(fontsize=6)
             if i == rows-1:  # Only add x-label on last row
                 plt.xlabel("Key Tokens")
-                plt.xticks(rotation=45, ha="right", fontsize=7)
+                plt.xticks(rotation=90, ha="right", fontsize=6)
     
     plt.tight_layout()
     plt.savefig("multi_head_layer_attention.png", dpi=300)
