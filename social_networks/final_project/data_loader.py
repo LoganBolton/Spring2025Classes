@@ -79,6 +79,9 @@ def aggregate_attention(raw_attn_matrix, node_token_map, num_nodes, method='aver
     return node_attn_matrix
 
 
+NODE_FEATURE_DIM = 16 # Choose a dimension (e.g., 16, 32, 64) - Hyperparameter
+
+
 class GraphAttentionDataset(Dataset):
     """
     PyTorch Geometric Dataset for loading graph structures and their
@@ -158,7 +161,8 @@ class GraphAttentionDataset(Dataset):
 
 
             # --- 3. Node Information ---
-            node_features = torch.eye(num_nodes, dtype=torch.float)
+            # node_features = torch.eye(num_nodes, dtype=torch.float)
+            node_features = torch.ones((num_nodes, NODE_FEATURE_DIM), dtype=torch.float)
 
             # --- 4. Ground Truth Edges ---
             if len(source_nodes) != len(target_nodes):
