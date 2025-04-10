@@ -20,32 +20,41 @@ model = LlamaForCausalLM.from_pretrained(
 num_nodes = 10
 max_possible_connections = num_nodes*(num_nodes-1)
 P_CONNECTION = 0.25
-num_graphs = 300
-metadata_path = 'attention_matrices/metadata.json'
+NUM_GRAPHS = 1
+# metadata_path = 'attention_matrices/arg_3_avg/metadata.json'
+metadata_path = 'attention_matrices/demo1/metadata.json'
 
-for z in range(num_graphs):
-    source = []
-    target = []
-    for node_1 in range(num_nodes):
-        for node_2 in range(num_nodes-1):
-            if node_1 == node_2:
-                continue
-            if random.random() < P_CONNECTION:
-                source.append(node_1)
-                target.append(node_2)
+
+for z in range(NUM_GRAPHS):
+    # source = []
+    # target = []
+    # for node_1 in range(num_nodes):
+    #     for node_2 in range(num_nodes-1):
+    #         if node_1 == node_2:
+    #             continue
+    #         if random.random() < P_CONNECTION:
+    #             source.append(node_1)
+    #             target.append(node_2)
             
-    # print(source, target)
-    alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    prompt = ""
-    for i in range(len(source)):
-        source_node = alphabet[source[i]]
-        target_node = alphabet[target[i]]
-        prompt += f"{source_node}:{target_node}\n"
-    if prompt == "":
-        continue
-    else:
-        prompt = prompt[0:-1] # get rid of last \n
-    # print(prompt)
+    # # print(source, target)
+    # alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    # prompt = ""
+    # for i in range(len(source)):
+    #     source_node = alphabet[source[i]]
+    #     target_node = alphabet[target[i]]
+    #     prompt += f"{source_node}->{target_node}\n"
+    # if prompt == "":
+    #     continue
+    # else:
+    #     prompt = prompt[0:-1] # get rid of last \n
+    prompt = """A -> B
+    A -> C
+    C -> B
+    D -> B
+    E -> D"""
+    source = [0, 0, 2, 3, 4]
+    target = [1, 2, 1, 1, 3]
+    print(prompt)
 
 
     inputs = tokenizer(prompt, return_tensors="pt")
@@ -55,12 +64,22 @@ for z in range(num_graphs):
         outputs = model(**inputs)
     attentions = outputs.attentions
 
-    # Extract average attention from the first layer
-    layer_idx = 0
-    avg_attention_matrix = attentions[layer_idx][0].mean(dim=0).detach().numpy()
+    # Extract attention maps for all layers
+    num_layers = len(attentions)
+    attention_matrix = attentions[0][0].detach().numpy()
+    # Retain only the top 3 values in each row
+    for row in attention_matrix:
+        top_indices = np.argpartition(row, -3)[-3:]
+        top_values = row[top_indices]
+        row.fill(0)  # Zero out the row
+        row[top_indices] = top_values  # Set top 3 values
+
+    # Average across heads
+    avg_attention_matrix = np.mean(attention_matrix, axis=0)
 
     # Save the matrix to a file for later GCN training
-    attention_file_path = f'attention_matrices/avg_attn_{z}.npy'
+    # attention_file_path = f'attention_matrices/arg_3_avg/avg_attn_{z}.npy'
+    attention_file_path = f'attention_matrices/demo1/avg_attn_{z}.npy'
     np.save(attention_file_path, avg_attention_matrix)
 
     # Confirm saving

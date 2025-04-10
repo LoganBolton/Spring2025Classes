@@ -1,3 +1,5 @@
+# This code lets you visualize any attention heads and layers
+
 import torch
 from transformers import LlamaForCausalLM, AutoTokenizer
 import matplotlib.pyplot as plt
@@ -17,20 +19,20 @@ model = LlamaForCausalLM.from_pretrained(
 )
 
 # Step 2: Prepare input text
-# text = """A -> B
-# A -> C
-# C -> B
-# D -> B
-# E -> D"""
+text = """A -> B
+A -> C
+C -> B
+D -> B
+E -> D"""
 # text = """A to B
 # A to C
 # C to B
 # D to B
 # E to D"""
-text = """A: B, C, D, E
-C: B
-D: B
-E: D"""
+# text = """A: B, C, D, E
+# C: B
+# D: B
+# E: D"""
 inputs = tokenizer(text, return_tensors="pt")
 base_tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
 
@@ -61,7 +63,7 @@ print(f"Tokens: {tokens}")
 # Optional: To visualize multiple heads from different layers
 def plot_multiple_heads_and_layers(
     layers_to_show=[0], 
-    heads_to_show=[0,3,12]):
+    heads_to_show=[0,1,2,3,4,5,12]):
     rows = len(layers_to_show)
     cols = len(heads_to_show)
     

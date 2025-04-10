@@ -25,3 +25,19 @@ you can look at an arrow and determine its parent
 
 ## layer 0, head 12
 A parent node to all the child nodes in a graph
+
+
+# Notation
+- to and -> are basically the same
+- Parents of: is complicated
+
+
+# Training the model
+Given the immediate drop to ln(2) and the flatline, the interaction between the attention weights (attn_edge_weight) and the GCN normalization is the strongest suspect. Start by printing the weight statistics and testing the model with attn_edge_weight=None.
+
+# Things To Try
+- Probably need to switch to ->
+- Use argmax of attention
+- Augment with all the different positons
+    - Its probably attending too much to the first pair
+    - Try mixing it up by having multiple different generations with different orderings and then avg togethr

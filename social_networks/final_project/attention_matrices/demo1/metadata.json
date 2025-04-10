@@ -1,0 +1,52 @@
+[
+  {
+    "attention_matrix_path": "attention_matrices/demo1/avg_attn_0.npy",
+    "max_nodes": 10,
+    "num_nodes": 5,
+    "num_edges": 5,
+    "connection_probability": 0.25,
+    "layer": "0",
+    "head": "all",
+    "source": [
+      0,
+      0,
+      2,
+      3,
+      4
+    ],
+    "target": [
+      1,
+      2,
+      1,
+      1,
+      3
+    ],
+    "tokens": [
+      "<|begin_of_text|>",
+      "A",
+      "\u0120->",
+      "\u0120B",
+      "\u010a",
+      "\u0120\u0120\u0120",
+      "\u0120A",
+      "\u0120->",
+      "\u0120C",
+      "\u010a",
+      "\u0120\u0120\u0120",
+      "\u0120C",
+      "\u0120->",
+      "\u0120B",
+      "\u010a",
+      "\u0120\u0120\u0120",
+      "\u0120D",
+      "\u0120->",
+      "\u0120B",
+      "\u010a",
+      "\u0120\u0120\u0120",
+      "\u0120E",
+      "\u0120->",
+      "\u0120D"
+    ],
+    "prompt": "A -> B\n    A -> C\n    C -> B\n    D -> B\n    E -> D"
+  }
+]
