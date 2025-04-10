@@ -164,7 +164,7 @@ def train_epoch(gcn_model, predictor, loader, optimizer, criterion, device):
     return total_loss / len(loader.dataset)
 
 # threshold is how confident it has to be to make a prediction
-def evaluate(gcn_model, predictor, loader, criterion, device, threshold=0.8):
+def evaluate(gcn_model, predictor, loader, criterion, device, threshold=0.55):
     gcn_model.eval()
     predictor.eval()
     total_loss = 0
