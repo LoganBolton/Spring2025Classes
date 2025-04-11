@@ -13,6 +13,8 @@ library('igraph')
 library(poweRlaw)
 library(dplyr)
 library(igraph)
+library(ggplot2) # For plotting
+
 ```
 
 
@@ -422,7 +424,7 @@ plot(alpha_values, avg_relative_largest_comp_size,
      cex = 0.8,
      col = "blue",
      xlab = expression("p / 1/(n-1)"), # Label using alpha = p/pc
-     ylab = "Relative Size of Largest Component",
+     ylab = "Relative Size of Largest Componen",
      main = paste("Giant Component Emergence in G(n, p) (n =", format(n, scientific = FALSE), ")"),
      ylim = c(0, 1.0), # Relative size is between 0 and 1
      cex.lab = 1.2,
@@ -439,7 +441,135 @@ grid()
 Show that the fraction S of vertices in the giant component satisfies: 1 - S = e^(-cS) by comparing the empirical value of S with the theoretical prediction (using numerical methods if needed).
 
 ```{r}
+solve_S_equation <- function(c_val) {
+  if (c_val <= 1) {
+    return(0) # No giant component expected for c <= 1
+  }
 
+  # Define the function whose root we want to find: f(S) = 1 - S - exp(-c*S)
+  f <- function(S, c_param) {
+    1 - S - exp(-c_param * S)
+  }
+
+  # Find the root in the interval (epsilon, 1].
+  # We use a small epsilon > 0 because S=0 is always a root,
+  # and uniroot needs endpoints with different signs.
+  # For c>1, f(epsilon) > 0 and f(1) < 0.
+  epsilon <- 1e-9
+  result <- tryCatch({
+    uniroot(f, interval = c(epsilon, 1), c_param = c_val)
+  }, error = function(e) {
+    warning(paste("Could not find root for c =", c_val, ":", e$message))
+    return(list(root = NA)) # Return NA if uniroot fails
+  })
+
+  return(result$root)
+}
+
+# --- Parameters ---
+n <- 10000 # Number of vertices (n >= 10,000)
+num_simulations_per_c <- 10 # Average over multiple runs for smoother results
+num_c_points <- 30         # Number of different c values to test
+
+# Choose a range of mean degrees 'c' > 1 (where a giant component exists)
+# We'll vary c directly, then calculate p
+min_c <- 1.1 # Start slightly above the threshold
+max_c <- 10.0
+c_values <- seq(min_c, max_c, length.out = num_c_points)
+p_values <- c_values / (n - 1) # Calculate corresponding p values
+
+# --- Storage for Results ---
+observed_S_avg <- numeric(length(c_values))
+theoretical_S <- numeric(length(c_values))
+
+# --- Computational Experiment ---
+cat(sprintf("Running simulations for n=%d...\n", n))
+
+for (i in 1:length(c_values)) {
+  c_current <- c_values[i]
+  p <- p_values[i]
+  current_run_S_values <- numeric(num_simulations_per_c)
+
+  # Calculate theoretical S *once* for this c
+  theoretical_S[i] <- solve_S_equation(c_current)
+
+  # Run multiple simulations for the current p value
+  for (j in 1:num_simulations_per_c) {
+    # Generate a G(n, p) random graph
+    g <- sample_gnp(n = n, p = p, directed = FALSE, loops = FALSE)
+
+    largest_comp_size <- 0 # Default size
+    if (gorder(g) > 0) {
+        comps <- components(g)
+        if (!is.null(comps$csize) && length(comps$csize) > 0) {
+            largest_comp_size <- max(comps$csize)
+        } else if (gorder(g) > 0 && gsize(g) == 0) {
+             largest_comp_size <- 1
+        }
+    }
+
+    # Calculate observed relative size S for this run
+    current_run_S_values[j] <- largest_comp_size / n
+
+  } # End inner loop (simulations for one c)
+
+  # Calculate the average observed S for this c value
+  observed_S_avg[i] <- mean(current_run_S_values, na.rm = TRUE)
+
+} # End outer loop (over c values)
+
+
+# --- Verification ---
+cat("--- Verification Summary ---\n")
+# Calculate differences (ignore potential NAs from failed root finding)
+valid_indices <- !is.na(theoretical_S)
+diff_S <- observed_S_avg[valid_indices] - theoretical_S[valid_indices]
+rel_diff_S <- diff_S / theoretical_S[valid_indices]
+# Handle division by zero if theoretical_S is exactly 0 (shouldn't happen for c>1)
+rel_diff_S[theoretical_S[valid_indices] == 0] <- 0
+rel_diff_S[is.infinite(rel_diff_S)] <- NA
+
+cat("Comparison of Observed S vs Theoretical S from 1-S=exp(-cS):\n")
+cat("  Mean absolute difference:", mean(abs(diff_S), na.rm=TRUE), "\n")
+cat("  Max absolute difference:", max(abs(diff_S), na.rm=TRUE), "\n")
+cat("  Mean abs relative difference (%):", mean(abs(rel_diff_S), na.rm = TRUE) * 100, "%\n")
+cat("  Max abs relative difference (%):", max(abs(rel_diff_S), na.rm = TRUE) * 100, "%\n")
+
+
+# --- Plotting ---
+par(mar = c(5, 5, 4, 2) + 0.1) # Adjust margins
+
+plot(c_values, observed_S_avg,
+     type = "p", # Points for observed
+     pch = 16,   # Solid circles
+     cex = 0.9,
+     col = "blue",
+     xlab = "Mean Degree (c = p(n-1))",
+     ylab = "Fraction in Giant Component (S)",
+     main = paste("Giant Component Size S vs. Mean Degree c (n =", format(n, scientific = FALSE), ")"),
+     ylim = c(0, 1.0),
+     xlim = range(c_values),
+     cex.lab = 1.2,
+     cex.axis = 1.1,
+     cex.main = 1.2)
+
+# Add the theoretical curve
+lines(c_values[valid_indices], theoretical_S[valid_indices],
+      type = "l", # Line for theoretical
+      col = "red",
+      lwd = 2)
+
+# Add a legend
+legend("bottomright", # Position legend appropriately
+       legend = c("Observed S (Simulation Avg)", "Theoretical S from 1-S=exp(-cS)"),
+       col = c("blue", "red"),
+       pch = c(16, NA), # Point symbol for observed, none for line
+       lty = c(NA, 1),  # Line type: none for observed, solid for theoretical
+       lwd = c(NA, 2),  # Line width
+       bg = "white")
+
+# Add grid lines
+grid()
 ```
 
 ### f) Small Components
@@ -447,21 +577,572 @@ Show that the fraction S of vertices in the giant component satisfies: 1 - S = e
 - Show that the average size of small components is: R = 2/(2 - c + cS)
 
 ```{r}
+solve_S_equation <- function(c_val) {
+  if (c_val <= 1) { return(0) }
+  f <- function(S, c_param) { 1 - S - exp(-c_param * S) }
+  epsilon <- 1e-9
+  result <- tryCatch({
+    uniroot(f, interval = c(epsilon, 1), c_param = c_val, tol = 1e-9)
+  }, error = function(e) {
+    # warning(paste("Could not find root for c =", c_val, ":", e$message))
+    return(list(root = NA))
+  })
+  # Check if root finding actually succeeded
+  if(is.na(result$root) || !is.numeric(result$root)){
+      # Fallback or alternative method could be added here if needed
+      # For now, just return NA to indicate failure
+      return(NA)
+  }
+  # Ensure root is within valid bounds (e.g., due to tolerance issues)
+  root_val <- result$root
+  if (root_val < 0 || root_val > 1) {
+      # warning(paste("Root out of bounds (0,1] for c =", c_val))
+      return(NA) # Consider it invalid
+  }
+  return(root_val)
+}
 
+
+# --- Parameters ---
+n <- 10000
+num_simulations_per_c <- 10 # Average results for stability
+num_c_points <- 30
+
+# Range of mean degrees 'c' > 1
+min_c <- 1.1
+max_c <- 6.0 # Reduce max_c slightly, as S approaches 1, denominator in R -> 2-c+c = 2
+c_values <- seq(min_c, max_c, length.out = num_c_points)
+p_values <- c_values / (n - 1)
+
+# --- Storage for Results ---
+observed_avg_R <- numeric(length(c_values))         # Avg size of small components
+observed_frac_trees <- numeric(length(c_values))    # Fraction of small comps that are trees
+theoretical_R <- numeric(length(c_values))
+
+# --- Computational Experiment ---
+cat(sprintf("Running simulations for n=%d...\n", n))
+
+for (i in 1:length(c_values)) {
+  c_current <- c_values[i]
+  p <- p_values[i]
+
+  # Store results for the simulations for this c
+  current_run_R_values <- numeric(num_simulations_per_c)
+  current_run_tree_fractions <- numeric(num_simulations_per_c)
+  valid_runs_for_R <- 0
+  valid_runs_for_trees <- 0
+
+  # --- Calculate Theoretical R ---
+  theoretical_S_val <- solve_S_equation(c_current)
+  if (!is.na(theoretical_S_val) && (2 - c_current + c_current * theoretical_S_val) != 0) {
+      theoretical_R[i] <- 2 / (2 - c_current + c_current * theoretical_S_val)
+  } else {
+      theoretical_R[i] <- NA # Undefined if S calculation failed or denominator is zero
+  }
+
+  # --- Inner Loop: Multiple simulations per c ---
+  for (j in 1:num_simulations_per_c) {
+    g <- sample_gnp(n = n, p = p, directed = FALSE, loops = FALSE)
+
+    if (gorder(g) == 0) next # Skip empty graph
+
+    comps <- components(g)
+    comp_sizes <- comps$csize
+    num_components <- length(comp_sizes)
+
+    if (num_components == 0) next # Skip if no components found
+
+    # Identify Giant Component (GC) and small components
+    idx_gc <- which.max(comp_sizes)
+    size_gc <- comp_sizes[idx_gc]
+
+    small_comp_indices <- setdiff(1:num_components, idx_gc)
+    num_small_components <- length(small_comp_indices)
+
+    # --- Analysis of Small Components ---
+    if (num_small_components > 0) {
+      small_comp_sizes <- comp_sizes[small_comp_indices]
+
+      # 1. Calculate Average Size R for this run
+      observed_R_this_run <- mean(small_comp_sizes)
+      current_run_R_values[j] <- observed_R_this_run
+      valid_runs_for_R <- valid_runs_for_R + 1
+
+      # 2. Check how many small components are trees
+      num_trees_among_small <- 0
+      for (k_idx in small_comp_indices) {
+        # Get vertices in this small component
+        verts_in_comp_k <- which(comps$membership == k_idx)
+        size_k <- length(verts_in_comp_k) # Should equal comp_sizes[k_idx]
+
+        if (size_k == 1) {
+          # Single node component is trivially a tree (0 edges = 1 - 1)
+          num_trees_among_small <- num_trees_among_small + 1
+        } else {
+          # Create induced subgraph for this component
+          sub_g <- induced_subgraph(g, vids = verts_in_comp_k, impl = "auto")
+          num_edges_in_comp = gsize(sub_g)
+          # Check tree condition: |E| = |V| - 1
+          if (num_edges_in_comp == size_k - 1) {
+            num_trees_among_small <- num_trees_among_small + 1
+          }
+        }
+      } # End loop over small components
+
+      # Calculate fraction of small components that are trees for this run
+      frac_trees_this_run <- num_trees_among_small / num_small_components
+      current_run_tree_fractions[j] <- frac_trees_this_run
+      valid_runs_for_trees <- valid_runs_for_trees + 1
+
+    } else {
+      # No small components (graph might be connected or empty)
+      # Assign NA or decide how to handle this. Let's use NA for averaging.
+      current_run_R_values[j] <- NA
+      current_run_tree_fractions[j] <- NA # Or 1.0 if vacuously true? Let's use NA.
+    }
+
+  } # End inner loop (simulations for one c)
+
+  # --- Aggregate results for this c ---
+  observed_avg_R[i] <- mean(current_run_R_values, na.rm = TRUE)
+  observed_frac_trees[i] <- mean(current_run_tree_fractions, na.rm = TRUE)
+   # If all runs resulted in NA (e.g., always connected), the mean will be NaN. Handle this.
+   if(is.nan(observed_avg_R[i])) observed_avg_R[i] <- NA
+   if(is.nan(observed_frac_trees[i])) observed_frac_trees[i] <- NA
+
+
+  # Optional: Print progress
+  cat(sprintf("c = %.3f | Obs R: %.3f | Th R: %.3f | Obs Tree Frac: %.4f\n",
+              c_current, observed_avg_R[i], theoretical_R[i], observed_frac_trees[i]))
+
+} # End outer loop (over c values)
+cat("Simulation finished.\n\n")
+
+
+# --- Verification & Reporting ---
+cat("--- Verification Summary ---\n")
+
+cat("Fraction of Small Components that are Trees:\n")
+# Check if any results were obtained
+valid_tree_indices <- !is.na(observed_frac_trees)
+if(any(valid_tree_indices)) {
+    cat(sprintf("  Observed Mean Fraction: %.5f\n", mean(observed_frac_trees, na.rm=TRUE)))
+    cat(sprintf("  Observed Min Fraction: %.5f\n", min(observed_frac_trees, na.rm=TRUE)))
+    cat(sprintf("  %% of c values where avg fraction was > 0.999: %.1f%%\n",
+                100 * mean(observed_frac_trees[valid_tree_indices] > 0.999)))
+} else {
+    cat("  No valid tree fraction data obtained.\n")
+}
+
+
+cat("\nAverage Size (R) of Small Components:\n")
+# Compare Observed R vs Theoretical R (only where theoretical R is defined)
+valid_R_indices <- !is.na(observed_avg_R) & !is.na(theoretical_R)
+if (any(valid_R_indices)) {
+    diff_R <- observed_avg_R[valid_R_indices] - theoretical_R[valid_R_indices]
+    rel_diff_R <- diff_R / theoretical_R[valid_R_indices]
+    rel_diff_R[is.infinite(rel_diff_R)] <- NA # Avoid Inf if theoretical R is near 0
+
+    cat("  Comparison vs Theoretical R = 2 / (2 - c + cS):\n")
+    cat(sprintf("    Mean absolute difference: %.4f\n", mean(abs(diff_R), na.rm=TRUE)))
+    cat(sprintf("    Max absolute difference: %.4f\n", max(abs(diff_R), na.rm=TRUE)))
+    cat(sprintf("    Mean abs relative difference (%%): %.2f%%\n", 100 * mean(abs(rel_diff_R), na.rm=TRUE)))
+    cat(sprintf("    Max abs relative difference (%%): %.2f%%\n", 100 * max(abs(rel_diff_R), na.rm=TRUE)))
+} else {
+     cat("  No valid data for comparing observed and theoretical R.\n")
+}
+
+
+# --- Plotting ---
+
+# Plot 1: Fraction of Small Components that are Trees
+par(mfrow = c(1, 2), mar = c(5, 4.5, 4, 2) + 0.1) # Arrange plots side-by-side
+
+plot(c_values[valid_tree_indices], observed_frac_trees[valid_tree_indices],
+     type = "b", pch = 16, col = "darkgreen", cex = 0.9,
+     xlab = "Mean Degree (c = p(n-1))",
+     ylab = "Avg. Fraction of Small Comps. that are Trees",
+     main = "Verification: Small Components are Trees",
+     ylim = c(min(0.95, min(observed_frac_trees, na.rm=T)), 1.01), # Zoom in near 1.0
+     cex.lab = 1.1, cex.axis = 1.0, cex.main = 1.1)
+abline(h = 1, col = "red", lty = 2) # Line at y=1.0
+grid()
+legend("bottomright", legend="Observed Fraction", col="darkgreen", pch=16, bg="white")
+
+
+# Plot 2: Average Size of Small Components (R)
+plot(c_values[valid_R_indices], observed_avg_R[valid_R_indices],
+     type = "p", pch = 16, col = "blue", cex = 0.9,
+     xlab = "Mean Degree (c = p(n-1))",
+     ylab = "Average Size of Small Components (R)",
+     main = "Average Size (R) vs. Mean Degree (c)",
+     ylim = c(0, max(observed_avg_R[valid_R_indices], theoretical_R[valid_R_indices], na.rm = TRUE) * 1.1),
+     cex.lab = 1.1, cex.axis = 1.0, cex.main = 1.1)
+
+# Add theoretical curve R = 2 / (2 - c + cS)
+lines(c_values[valid_R_indices], theoretical_R[valid_R_indices],
+      col = "red", lwd = 2)
+
+grid()
+legend("topleft",
+       legend = c("Observed Avg Size (R)", "Theoretical R = 2/(2-c+cS)"),
+       col = c("blue", "red"),
+       pch = c(16, NA), lty = c(NA, 1), lwd = c(NA, 2), bg = "white")
 ```
 
 ### g) Fraction of Vertices in Small Components
 Verify that the fraction of vertices in small components follows (e^(-sc)*(sc)^(s-1))/s!
 
 ```{r}
+solve_S_equation <- function(c_val) {
+  if (c_val <= 1) {
+    return(0)
+  }
+  f <- function(S, c_param) { 1 - S - exp(-c_param * S) }
+  epsilon <- 1e-9
+  result <- tryCatch({
+    uniroot(f, interval = c(epsilon, 1), c_param = c_val, tol = 1e-9)
+  }, error = function(e) {
+    warning(paste("Could not find root for S, c =", c_val, ":", e$message))
+    return(list(root = NA))
+  })
+  if(is.na(result$root) || !is.numeric(result$root)){ return(NA) }
+  root_val <- result$root
+  if (root_val < 0 || root_val > 1) { return(NA) }
+  return(root_val)
+}
 
+# --- Parameters ---
+n <- 10000
+c_fixed <- 1.5 # Mean degree > 1
+p <- c_fixed / (n - 1)
+num_simulations <- 100 # Increase for smoother empirical curve
+
+cat(sprintf("Parameters: n=%d, c=%.2f, p=%.6f\n", n, c_fixed, p))
+cat(sprintf("Running %d simulations...\n", num_simulations))
+
+# --- Storage for all small component sizes ---
+all_small_comp_sizes <- list()
+total_small_components_collected <- 0
+
+# --- Simulation Loop ---
+for (sim in 1:num_simulations) {
+  g <- sample_gnp(n = n, p = p, directed = FALSE, loops = FALSE)
+
+  if (gorder(g) == 0) next
+
+  comps <- components(g)
+  comp_sizes <- comps$csize
+  num_components <- length(comp_sizes)
+
+  if (num_components <= 1) next # Need at least one small component
+
+  # Identify Giant Component (GC)
+  idx_gc <- which.max(comp_sizes)
+
+  # Get sizes of small components
+  small_comp_indices <- setdiff(1:num_components, idx_gc)
+  if (length(small_comp_indices) > 0) {
+      current_small_sizes <- comp_sizes[small_comp_indices]
+      all_small_comp_sizes[[length(all_small_comp_sizes) + 1]] <- current_small_sizes
+      total_small_components_collected <- total_small_components_collected + length(current_small_sizes)
+  }
+
+  if (sim %% 20 == 0 || sim == num_simulations) cat(sprintf("  Simulation %d completed.\n", sim))
+
+} # End simulation loop
+
+cat(sprintf("Finished simulations. Collected %d small components.\n", total_small_components_collected))
+
+# --- Process Collected Data ---
+if (total_small_components_collected > 0) {
+  # Combine all sizes into one vector
+  all_sizes_vector <- unlist(all_small_comp_sizes)
+
+  # Calculate empirical frequency distribution
+  # P_emp(s) = (Number of small components of size s) / (Total number of small components)
+  size_counts <- table(all_sizes_vector)
+  s_values_observed <- as.numeric(names(size_counts))
+  pk_empirical <- as.numeric(size_counts) / total_small_components_collected
+
+  # Limit max s for plotting if needed (distribution decays quickly)
+  max_s_plot <- min(max(s_values_observed), 50) # Adjust as needed
+  # Ensure we only work with s values >= 1 for theoretical part
+  s_values_plot_indices <- which(s_values_observed >= 1 & s_values_observed <= max_s_plot)
+  s_values_plot <- s_values_observed[s_values_plot_indices]
+  pk_empirical_plot <- pk_empirical[s_values_plot_indices]
+
+
+  # --- Calculate Theoretical Distribution P(s) (Unnormalized mu(s)) ---
+  # P(s) = Prob(random vertex is in finite component of size s)
+  # Using P(s) = [ (c*s)^(s-1) / s! ] * exp(-c*s)
+  pk_theoretical_unnormalized_mu <- numeric(length(s_values_plot))
+
+  for (idx in 1:length(s_values_plot)) {
+      s <- s_values_plot[idx]
+      # s=1 case
+      if (s == 1) {
+          log_pk <- -c_fixed
+      } else { # s > 1 case
+          # Use logs for numerical stability: log(P) = (s-1)*log(c*s) - lgamma(s+1) - c*s
+          cs_term = c_fixed * s
+          # Check for potential numerical issues or invalid inputs
+          if (cs_term <= 0 || !is.finite(cs_term)) {
+              log_pk <- -Inf
+          } else {
+              term1 <- (s - 1) * log(cs_term)
+              term2 <- lgamma(s + 1) # log(s!)
+              term3 <- c_fixed * s
+              # Ensure terms are finite before subtraction
+              if (is.finite(term1) && is.finite(term2) && is.finite(term3)) {
+                   log_pk <- term1 - term2 - term3
+              } else {
+                  log_pk <- -Inf # Assign -Inf if any term calculation failed
+              }
+          }
+      }
+      # Check for NaN/Inf before exponentiating
+      if (is.finite(log_pk)) {
+            pk_theoretical_unnormalized_mu[idx] <- exp(log_pk)
+      } else {
+            pk_theoretical_unnormalized_mu[idx] <- 0 # Assign 0 if calculation failed
+      }
+  }
+
+  # --- Calculate Terms for pi(s) Distribution ---
+  # pi(s) is proportional to P(s) / s
+  # This represents the expected number of components of size s (up to a factor n)
+  terms_pi_s <- pk_theoretical_unnormalized_mu / s_values_plot
+  # Handle potential division by zero for s=0 (should not be in s_values_plot now)
+  # Handle potential NaN if pk_theoretical_unnormalized_mu was 0
+  terms_pi_s[!is.finite(terms_pi_s)] <- 0
+
+  # --- Calculate Normalization Constant Z for pi(s) ---
+  # Z = Sum_{k=1}^\infty (P(k) / k) approximated over the plotted range
+  # This represents the expected total number of small components (up to a factor n)
+  normalization_constant_Z <- sum(terms_pi_s, na.rm = TRUE)
+  cat(sprintf("Normalization Constant Z = Sum(P(k)/k) approx = %.5f\n", normalization_constant_Z))
+
+  # --- FINAL Correctly Normalized Theoretical Distribution pi(s) ---
+  # pi(s) = P(size=s | component is small) = (P(s) / s) / Z
+   if (normalization_constant_Z > 1e-12) { # Avoid division by zero
+        pk_theoretical_normalized_pi <- terms_pi_s / normalization_constant_Z
+   } else {
+       pk_theoretical_normalized_pi <- terms_pi_s * 0 # Set to zero if Z is effectively zero
+       warning("Normalization constant Z = Sum(P(k)/k) is close to zero.")
+   }
+
+  # --- Plotting ---
+  par(mar = c(5, 5, 4, 2) + 0.1) # Adjust margins
+
+  # Determine plot range carefully for log scale
+  # Filter out zero probabilities before taking min for log scale
+  y_min_emp <- min(pk_empirical_plot[pk_empirical_plot > 0], na.rm = TRUE)
+  y_min_the <- min(pk_theoretical_normalized_pi[pk_theoretical_normalized_pi > 0], na.rm = TRUE)
+  y_min_plot <- min(y_min_emp, y_min_the, na.rm = TRUE) * 0.5 # Add buffer below min
+  if (!is.finite(y_min_plot) || y_min_plot <= 0) y_min_plot <- 1e-8 # Fallback if all are zero or NA
+
+  y_max_plot <- max(c(pk_empirical_plot, pk_theoretical_normalized_pi), na.rm = TRUE) * 1.5 # Buffer above max
+
+  plot(s_values_plot, pk_empirical_plot,
+       type = "p", # Points
+       pch = 16,   # Solid circles
+       col = "blue",
+       cex = 0.9,
+       log = "y",  # Log scale for y-axis
+       xlab = "Size of Small Component (s)",
+       ylab = "P(size=s | component is small)", # Correct label interpretation
+       main = paste("Size Distribution of Small Components (c =", c_fixed, ")"),
+       ylim = c(y_min_plot, y_max_plot),
+       xlim = c(0, max_s_plot + 1),
+       cex.lab = 1.2, cex.axis = 1.1, cex.main = 1.2,
+       xaxt = "n") # Suppress default x-axis to draw custom ticks
+  axis(1, at = seq(0, max_s_plot, by = 5)) # Custom x-axis ticks
+
+  # Overlay the NEW theoretical probabilities pi(s)
+  points(s_values_plot, pk_theoretical_normalized_pi,
+         type = "p", # Points
+         pch = 4,    # Crosses
+         col = "red",
+         cex = 0.9)
+  lines(s_values_plot, pk_theoretical_normalized_pi, # Add lines for theoretical
+         type = "l",
+         col = "red",
+         lty = 2) # Dashed line
+
+
+  # Add a legend
+  legend("topright",
+         legend = c("Empirical P(s) (Simulation)", "Theoretical pi(s) = (P(s)/s)/Z"), # Updated legend text
+         col = c("blue", "red"),
+         pch = c(16, 4), # Point symbols
+         lty = c(NA, 2), # Line type for theoretical
+         bg = "white")
+
+  # Add grid lines (corrected)
+  grid()
+
+} else {
+  cat("No small components were collected during the simulations.\n")
+  cat("Try increasing num_simulations or using a 'c' value closer to 1.\n")
+}
 ```
 
 ### h) Diameter
 Show that the diameter of G(n, p) follows: diameter = A + ln(n)/ln(c) where A is a constant.
 
 ```{r}
+target_c <- 5.0
 
+# Choose a range of n values
+# Note: Diameter calculation is slow for large n. Start smaller, increase if feasible.
+# Let's try a logarithmic scale for n initially, maybe refine later
+# n_values <- floor(10^seq(2.5, 3.7, length.out = 8)) # e.g., ~316 to ~5011
+n_values <- floor(seq(500, 5000, length.out = 10)) # Linear scale
+# n_values <- c(1000, 2000, 4000, 8000, 10000) # Specific large values
+
+# Number of replicates for each n to average out randomness
+num_replicates <- 5 # Increase if results are too noisy and time permits
+
+cat(sprintf("Target Average Degree (c): %.2f\n", target_c))
+cat("N values to test:", paste(n_values, collapse=", "), "\n")
+cat("Replicates per n:", num_replicates, "\n")
+
+# --- Storage for Results ---
+results <- data.frame(
+  n = integer(),
+  log_n = numeric(),
+  p = numeric(),
+  avg_diameter = numeric(),
+  sd_diameter = numeric() # Standard deviation of diameter across replicates
+)
+
+# --- Computational Experiment ---
+cat("Running simulations...\n")
+start_time <- Sys.time()
+
+for (n in n_values) {
+  if (n <= 1) next # Skip n=1
+
+  # Calculate p for this n to keep c constant
+  p <- target_c / (n - 1)
+
+  # Ensure p is valid
+  if (p < 0 || p > 1) {
+    cat(sprintf("Skipping n=%d, invalid p=%.5f\n", n, p))
+    next
+  }
+
+  cat(sprintf("Processing n = %d (p = %.6f)...\n", n, p))
+  diameters_for_n <- numeric(num_replicates)
+
+  for (i in 1:num_replicates) {
+    g <- sample_gnp(n = n, p = p, directed = FALSE, loops = FALSE)
+
+    # Check connectivity and find largest component
+    comp_info <- components(g, mode = "weak") # "strong" or "weak" is same for undirected
+
+    if (comp_info$no == 0) {
+        # Empty graph case (shouldn't happen for n>0)
+        diameters_for_n[i] <- NA # Or 0? Or handle as error?
+        warning(paste("Empty graph generated for n=", n))
+    } else if (comp_info$no == 1) {
+      # Graph is connected
+      diameters_for_n[i] <- diameter(g, unconnected = FALSE) # Use FALSE since known connected
+    } else {
+      # Graph is disconnected, find diameter of the largest component
+      largest_comp_id <- which.max(comp_info$csize)
+      nodes_in_largest <- which(comp_info$membership == largest_comp_id)
+
+      # Create subgraph of the largest component
+      sg <- induced_subgraph(g, vids = nodes_in_largest)
+
+      if (gorder(sg) > 1) {
+          diameters_for_n[i] <- diameter(sg, unconnected = FALSE)
+      } else {
+          # Largest component has only 1 node (or 0 somehow)
+          diameters_for_n[i] <- 0
+      }
+    }
+    # Optional: progress within replicates
+    # cat(sprintf("  Rep %d/%d, diameter=%d\n", i, num_replicates, diameters_for_n[i]))
+  }
+
+  # Store average and standard deviation
+  valid_diameters <- diameters_for_n[!is.na(diameters_for_n)]
+  if (length(valid_diameters) > 0) {
+      results <- rbind(results, data.frame(
+        n = n,
+        log_n = log(n), # Natural logarithm
+        p = p,
+        avg_diameter = mean(valid_diameters),
+        sd_diameter = sd(valid_diameters)
+     ))
+  } else {
+      cat(sprintf("Warning: No valid diameters calculated for n=%d\n", n))
+  }
+
+}
+
+end_time <- Sys.time()
+cat("Simulations finished. Time taken:", format(end_time - start_time), "\n\n")
+
+# --- Analysis ---
+print("--- Simulation Results ---")
+print(results)
+
+if (nrow(results) < 2) {
+  cat("Not enough data points for regression analysis.\n")
+} else {
+  # Calculate theoretical slope
+  theoretical_slope <- 1 / log(target_c)
+  cat(sprintf("\nTheoretical slope (1 / ln(c)) = 1 / ln(%.2f) = %.4f\n",
+              target_c, theoretical_slope))
+
+  # Perform linear regression: avg_diameter ~ log(n)
+  model <- lm(avg_diameter ~ log_n, data = results)
+
+  cat("\n--- Linear Regression: avg_diameter ~ log(n) ---\n")
+  print(summary(model))
+
+  # Extract coefficients
+  intercept_A <- coef(model)[1]
+  empirical_slope_B <- coef(model)[2]
+
+  cat(sprintf("\nEstimated Intercept (A): %.4f\n", intercept_A))
+  cat(sprintf("Estimated Slope (B): %.4f\n", empirical_slope_B))
+
+  # Compare empirical slope with theoretical slope
+  cat(sprintf("\nComparison:\n"))
+  cat(sprintf("  Theoretical Slope = %.4f\n", theoretical_slope))
+  cat(sprintf("  Empirical Slope   = %.4f\n", empirical_slope_B))
+  cat(sprintf("  Relative Difference = %.2f %%\n",
+              100 * abs(empirical_slope_B - theoretical_slope) / theoretical_slope))
+
+  # --- Plotting ---
+  plot_title <- sprintf("G(n, p) Diameter vs. ln(n) for fixed c=%.1f", target_c)
+  plot_subtitle <- sprintf("Slope Theory=%.3f, Empirical=%.3f | Intercept (A)=%.2f",
+                          theoretical_slope, empirical_slope_B, intercept_A)
+
+  gg <- ggplot(results, aes(x = log_n, y = avg_diameter)) +
+    geom_point(aes(size = n), color = "blue", alpha = 0.7) + # Size points by n
+    geom_smooth(method = "lm", se = TRUE, color = "red", formula = y ~ x) + # Add regression line + CI
+    # Optional: Add error bars if sd_diameter is meaningful
+    # geom_errorbar(aes(ymin = avg_diameter - sd_diameter, ymax = avg_diameter + sd_diameter),
+    #               width = 0.05, alpha = 0.5) +
+    labs(
+      title = plot_title,
+      subtitle = plot_subtitle,
+      x = "ln(n)",
+      y = "Average Diameter (Largest Component)",
+      size = "n" # Legend title for size
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5, size=10))
+
+  print(gg)
+}
 ```
 
 # 2) Empirical Analysis of Real-World Network
@@ -479,20 +1160,179 @@ print(paste("Number of nodes:", vcount(g)))
 print(paste("Number of edges:", ecount(g)))
 ```
 
+# Optimize this
 ### a) Construct a graph G based on the data set
 Analyze some basic network properties of G including order, size, density, connectivity (if G is not connected, find the number of components of G and the fraction of vertices in the largest component), and clustering coefficient.
 
 ```{r}
+num_nodes <- vcount(g)
+print(paste("Order (Number of Nodes):", num_nodes))
 
+# 2. Size (Number of Edges)
+num_edges <- ecount(g)
+print(paste("Size (Number of Edges):", num_edges))
+
+# 3. Density
+# Density = E / E_max, where E is the number of edges, E_max is the max possible edges.
+# For an undirected graph without loops, E_max = N * (N - 1) / 2
+graph_density <- edge_density(g)
+print(paste("Density:", sprintf("%.6f", graph_density))) # Format for readability
+
+# 4. Connectivity
+is_graph_connected <- is_connected(g)
+print(paste("Is the graph connected?", is_graph_connected))
+
+if (!is_graph_connected) {
+  components_info <- components(g)
+  num_components <- components_info$no
+  print(paste("Number of connected components:", num_components))
+
+  # Size of the largest component
+  lcc_size <- max(components_info$csize)
+  print(paste("Size of the largest connected component (LCC):", lcc_size))
+
+  # Fraction of vertices in the largest component
+  fraction_in_lcc <- lcc_size / num_nodes
+  print(paste("Fraction of vertices in LCC:", sprintf("%.4f", fraction_in_lcc)))
+} else {
+  print("The graph is connected, consisting of a single component.")
+  # If connected, LCC size is total nodes, fraction is 1.
+  lcc_size <- num_nodes
+  fraction_in_lcc <- 1.0
+  print(paste("Size of the largest connected component (LCC):", lcc_size))
+  print(paste("Fraction of vertices in LCC:", sprintf("%.4f", fraction_in_lcc)))
+}
+
+# 5. Clustering Coefficient (Transitivity)
+# igraph provides two main types:
+# - Global clustering coefficient (transitivity): ratio of triangles to connected triples
+# - Average clustering coefficient: average of the local clustering coefficient for each node
+
+global_cc <- transitivity(g, type = "global")
+average_cc <- transitivity(g, type = "average")
+
+print(paste("Global Clustering Coefficient (Transitivity):", sprintf("%.4f", global_cc)))
+print(paste("Average Clustering Coefficient:", sprintf("%.4f", average_cc)))
+
+# Store results for potential later use
+basic_properties <- list(
+  order = num_nodes,
+  size = num_edges,
+  density = graph_density,
+  is_connected = is_graph_connected,
+  num_components = if (!is_graph_connected) components_info$no else 1,
+  lcc_size = lcc_size,
+  fraction_in_lcc = fraction_in_lcc,
+  global_clustering_coeff = global_cc,
+  average_clustering_coeff = average_cc
+)
 ```
 
 ### b) Generate a configuration model G*
 Generate a configuration model G* that has the same degree sequence as that of G's.
 
 ```{r}
+g_undir <- as.undirected(g, mode = "collapse")
+
+deg_seq_original <- degree(g_undir)
+print(paste("Successfully extracted degree sequence from the original graph. Number of degrees:", length(deg_seq_original)))
+
+# Check if the sum of degrees is even (necessary condition for graph construction)
+if (sum(deg_seq_original) %% 2 != 0) {
+  stop("Sum of degrees is odd. Cannot construct a graph with this degree sequence. This is unexpected for a graph derived from an edge list.")
+} else {
+    print("Sum of degrees is even, proceeding to generate G*.")
+}
+
+# 2. Generate the configuration model graph G* using sample_degseq
+# We use the degree sequence from the original graph 'g_undir'.
+# The method 'fast.heur.simple' is recommended by igraph warnings over 'simple.no.multiple'.
+# It attempts to create a simple graph (no loops, no multiple edges) matching the degree sequence.
+# Note: The *pure* configuration model allows loops and multi-edges (methods 'simple' or 'vl'),
+# but often the goal is to compare against a simple graph, hence this method choice.
+print("Generating Configuration Model graph G*...")
+G_star <- sample_degseq(deg_seq_original, method = "fast.heur.simple")
+print("Configuration Model graph G* generated successfully.")
+
+# 3. Optional Verification: Check if G* has the correct degree sequence
+deg_seq_G_star <- degree(G_star)
+if (length(deg_seq_original) == length(deg_seq_G_star) && all(sort(deg_seq_original) == sort(deg_seq_G_star))) {
+  print("Verification successful: G* has the same degree sequence as G.")
+} else {
+  warning("Verification potentially failed: The degree sequence of G* does not perfectly match G. This might occur with certain generation methods or edge cases.")
+  # You could add more detailed comparison here if needed
+  # print(summary(deg_seq_original))
+  # print(summary(deg_seq_G_star))
+}
+```
+```{r}
+deg_seq_G_star <- degree(G_star)
+print("Extracted degree sequence from the Configuration Model graph G*.")
+
+# Create a data frame suitable for ggplot
+# Combine degree sequences and add a factor to identify the network
+deg_df <- data.frame(
+  Degree = c(deg_seq_original, deg_seq_G_star),
+  Network = factor(
+              rep(c("Original (G)", "Configuration (G*)"),
+                  times = c(length(deg_seq_original), length(deg_seq_G_star))),
+              levels = c("Original (G)", "Configuration (G*)") # Control plotting order
+            )
+)
+
+print("Created combined data frame for plotting.")
+head(deg_df) # Show the first few rows
+
+# --- Plotting the Degree Distributions ---
+
+# Using density plots on a log-log scale is common for network degrees
+
+plot_deg_dist <- ggplot(deg_df, aes(x = Degree + 1, color = Network)) + # Add 1 to Degree to avoid log(0)
+  geom_density(alpha = 0.7, linewidth = 1.1, adjust=0.5) + # Use geom_density for smoothed distribution
+  scale_x_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), # Log scale for x-axis
+                labels = scales::trans_format("log10", scales::math_format(10^.x))) +
+  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), # Log scale for y-axis
+                labels = scales::trans_format("log10", scales::math_format(10^.x))) +
+  labs(
+    title = "Degree Distribution Comparison",
+    x = "Degree k (log scale, plotted as k+1)",
+    y = "Density P(k) (log scale)",
+    color = "Network Type" # Legend title
+  ) +
+  theme_bw() + # A clean theme
+  theme(legend.position = "bottom") +
+  annotation_logticks() # Add log tick marks
+
+# Print the plot
+print(plot_deg_dist)
+
+# --- Alternative: Histogram-like plot using stat_bin ---
+# This gives a feel closer to the binned plots in the original example, but automated by ggplot
+# Note: You might need to adjust binwidth or bins for a good look
+
+plot_deg_hist <- ggplot(deg_df, aes(x = Degree + 1, fill = Network)) + # Add 1 to Degree to avoid log(0)
+  # Use stat_bin to create histogram bars, position="identity" overlays them
+  # Use ..density.. on y-axis to get probability density
+  stat_bin(aes(y = ..density..), binwidth = 0.2, position = "identity", alpha = 0.6) +
+  scale_x_log10(breaks = scales::trans_breaks("log10", function(x) 10^x),
+                labels = scales::trans_format("log10", scales::math_format(10^.x))) +
+  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x),
+                labels = scales::trans_format("log10", scales::math_format(10^.x)),
+                limits = c(NA, NA)) + # Adjust y-limits if needed, NA keeps defaults
+  labs(
+    title = "Degree Distribution Comparison (Histogram-like)",
+    x = "Degree k (log scale, plotted as k+1)",
+    y = "Density P(k) (log scale)",
+    fill = "Network Type"
+  ) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  annotation_logticks() +
+  facet_wrap(~Network, ncol=1) # Separate panels for clarity
+
+print(plot_deg_hist)
 
 ```
-
 ### c) Analyze model properties
 Analyze some basic network properties of G*.
 
@@ -501,10 +1341,8 @@ Analyze some basic network properties of G*.
 ```
 
 ### d) Compare networks
-Ident
-
+identify similarities and differences between G and G*.
 ```{r}
 
 ```
-fy similarities and differences between G and G*.
 
