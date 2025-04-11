@@ -41,3 +41,11 @@ Given the immediate drop to ln(2) and the flatline, the interaction between the 
 - Augment with all the different positons
     - Its probably attending too much to the first pair
     - Try mixing it up by having multiple different generations with different orderings and then avg togethr
+- Analysis of average on toy:
+    - Everything attending to either start token or just self attention
+
+
+# WIP TODO
+- got all the matrixes in every position saved
+- Need to convert from tokens to english matrix
+- THEN average them all 
