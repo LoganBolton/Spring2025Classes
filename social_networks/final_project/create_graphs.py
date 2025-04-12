@@ -66,7 +66,7 @@ def create_gt_adjacency(source, target, num_nodes):
 num_nodes = 6
 max_possible_connections = num_nodes*(num_nodes-1)
 P_CONNECTION = 0.25
-NUM_GRAPHS = 2
+NUM_GRAPHS = 200
 
 source_dir = 'attention_matrices/demo1'
 metadata_path = f'{source_dir}/metadata.json'
