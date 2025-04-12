@@ -69,9 +69,9 @@ def aggregate_attention(raw_attn_matrix, node_token_map, num_nodes):
 
     return node_attn_matrix
 
-source_dir = 'attention_matrices/demo1'
+source_dir = 'attention_matrices/arg_3'
 metadata_path = f'{source_dir}/metadata.json'
-save_dir = 'attention_matrices/demo1/combined'
+save_dir = f'{source_dir}/combined'
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
     
