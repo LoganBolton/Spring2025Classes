@@ -85,3 +85,26 @@ Training history saved to attention_matrices/arg_3/combined/gcn_training_output_
 
 --- Final Evaluation on Test Set using Best Model ---
 Final Results - Test Loss: 0.6876, Test Acc: 0.5474, Test F1: 0.3175
+
+## MLP 
+looks like top 3 is marginally better?
+- This is with max 6 nodes
+
+
+- Seems to be that doing top 3 when nodes == 10 is not the move
+
+### top k == 3
+--- Training Complete ---
+Best Test F1 Score: 0.7483 at Epoch 178
+Training history saved to attention_matrices/arg_3/combined/mlp_baseline_training_output/training_history.csv
+
+--- Final Evaluation on Test Set using Best Model ---
+Final Results - Test Loss: 0.4674, Test Acc (non-diag): 0.8150, Test F1 (non-diag): 0.7483
+
+### no args
+--- Training Complete ---
+Best Test F1 Score: 0.7336 at Epoch 197
+Training history saved to attention_matrices/no_args/combined/mlp_baseline_training_output/training_history.csv
+
+--- Final Evaluation on Test Set using Best Model ---
+Final Results - Test Loss: 0.4701, Test Acc (non-diag): 0.7833, Test F1 (non-diag): 0.7336
