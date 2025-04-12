@@ -55,3 +55,33 @@ Right now I'm looking at every node, no matter its position. Maybe its best to o
     - Change from all nodes to just looking at parent or child nodes
     - Kinda more boring though
     - Hope it can get both
+
+
+
+# Ablations
+Looks like just using all nodes doesn't work ...
+
+## No args
+Epoch: 050, Train Loss: 0.6466, Test Loss: 0.6543, Test Acc: 0.5500, Test F1: 0.0000
+
+--- Training Complete ---
+Best Test F1 Score: 0.2479 at Epoch 1
+Training history saved to gcn_training_output_hardcoded/training_history.csv
+
+--- Final Evaluation on Test Set using Best Model ---
+Final Results - Test Loss: 0.6875, Test Acc: 0.5111, Test F1: 0.2479
+
+--- Final Evaluation on Test Set using Best Model ---
+Loaded best model from gcn_training_output_hardcoded/best_model.pt
+Final Results - Test Loss: 0.6875, Test Acc: 0.5111, Test F1: 0.2479
+
+## top k == 3
+
+Epoch: 050, Train Loss: 0.6611, Test Loss: 0.6607, Test Acc: 0.5368, Test F1: 0.0000
+
+--- Training Complete ---
+Best Test F1 Score: 0.3175 at Epoch 1
+Training history saved to attention_matrices/arg_3/combined/gcn_training_output_hardcoded/training_history.csv
+
+--- Final Evaluation on Test Set using Best Model ---
+Final Results - Test Loss: 0.6876, Test Acc: 0.5474, Test F1: 0.3175
