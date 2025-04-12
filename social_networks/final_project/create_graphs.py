@@ -6,6 +6,7 @@ import random
 import os
 import json
 
+# Load Llama Model
 model_name = "meta-llama/Llama-3.2-1B"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = LlamaForCausalLM.from_pretrained(
@@ -16,17 +17,7 @@ model = LlamaForCausalLM.from_pretrained(
     low_cpu_mem_usage=True
 )
 
-
-num_nodes = 10
-max_possible_connections = num_nodes*(num_nodes-1)
-P_CONNECTION = 0.25
-NUM_GRAPHS = 1
-source_dir = 'attention_matrices/demo1'
-metadata_path = f'{source_dir}/metadata.json'
-
-if not os.path.exists(source_dir):
-    os.makedirs(source_dir)
-
+# Utilitiy functions
 def create_pertubations(source, target):
     sources, targets = [], []
     
@@ -58,24 +49,50 @@ def create_prompts(sources, targets):
             prompt += f"{source_node}->{target_node}\n"
         prompts.append(prompt)
     return prompts
+
+def create_gt_adjacency(source, target, num_nodes):
+    # Find the size of the matrix
+    n = num_nodes
     
+    # Create an n×n matrix filled with zeros
+    matrix = np.zeros((n, n), dtype=int)
+    
+    # Set the connections
+    for s, t in zip(source, target):
+        matrix[s][t] = 1
+    
+    return matrix
+    
+num_nodes = 6
+max_possible_connections = num_nodes*(num_nodes-1)
+P_CONNECTION = 0.25
+NUM_GRAPHS = 1
+
+source_dir = 'attention_matrices/demo1'
+metadata_path = f'{source_dir}/metadata.json'
+if not os.path.exists(source_dir):
+    os.makedirs(source_dir)
+
+
 for graph_id in range(NUM_GRAPHS):
-    # source = []
-    # target = []
-    # for node_1 in range(num_nodes):
-    #     for node_2 in range(num_nodes-1):
-    #         if node_1 == node_2:
-    #             continue
-    #         if random.random() < P_CONNECTION:
-    #             source.append(node_1)
-    #             target.append(node_2)
-    source = [0, 0, 2, 3, 4]
-    target = [1, 2, 1, 1, 3]
+    # Generate random GT adjacency matrix
+    source = []
+    target = []
+    for node_1 in range(num_nodes):
+        for node_2 in range(num_nodes-1):
+            if node_1 == node_2:
+                continue
+            if random.random() < P_CONNECTION:
+                source.append(node_1)
+                target.append(node_2)
+    # source = [0, 0, 2, 3, 4]
+    # target = [1, 2, 1, 1, 3]
     
     sources, targets = create_pertubations(source, target)
     prompts = create_prompts(sources, targets)
+    gt_adjacency = create_gt_adjacency(source, target, num_nodes)
     
-    
+    # Generate all variations of a graph
     for i in range(len(prompts)):
         source = sources[i]
         target = targets[i]
@@ -175,6 +192,7 @@ for graph_id in range(NUM_GRAPHS):
             "connection_probability": P_CONNECTION,
             "layer": '0',
             "head": 'all',
+            "gt_adjacency": gt_adjacency.tolist(),
             "source": source,
             "target": target,
             "tokens": base_tokens,
@@ -193,4 +211,3 @@ for graph_id in range(NUM_GRAPHS):
         # Write the updated metadata to file
         with open(metadata_path, 'w') as f:
             json.dump(metadata, f, indent=2)
-        
