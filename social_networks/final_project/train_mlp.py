@@ -16,7 +16,7 @@ from tqdm import tqdm
 import pandas as pd
 
 # --- Configuration Parameters ---
-RUN_PATH = 'attention_matrices/arg_3/combined'
+RUN_PATH = 'attention_matrices/no_args_6/combined'
 METADATA_PATH = f'/Users/log/Github/Spring2025Classes/social_networks/final_project/{RUN_PATH}/combined_metadata.json'
 DATA_DIR = f'/Users/log/Github/Spring2025Classes/social_networks/final_project/'
 EPOCHS = 200

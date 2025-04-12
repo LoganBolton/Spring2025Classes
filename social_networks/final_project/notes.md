@@ -108,3 +108,12 @@ Training history saved to attention_matrices/no_args/combined/mlp_baseline_train
 
 --- Final Evaluation on Test Set using Best Model ---
 Final Results - Test Loss: 0.4701, Test Acc (non-diag): 0.7833, Test F1 (non-diag): 0.7336
+
+## size 10
+taking the max of 3 is actually better
+### arg 3
+epoch,train_loss,test_loss,test_accuracy,test_f1
+200,0.389309224486351,0.6456100821495057,0.6011111111111112,0.5184439973172368
+
+### no args
+Epoch: 200, Train Loss: 0.4577, Test Loss: 0.6107, Test Acc: 0.5769, Test F1: 0.4366
