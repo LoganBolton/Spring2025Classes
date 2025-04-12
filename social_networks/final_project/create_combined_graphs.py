@@ -27,48 +27,45 @@ def get_node_token_mapping(tokens, num_nodes):
 
 def aggregate_attention(raw_attn_matrix, node_token_map, num_nodes):
     """
-    Aggregates token-level attention to node-level attention.
+    Aggregates token-level attention to node-level attention, respecting causal masking.
 
     Args:
         raw_attn_matrix (torch.Tensor): Token attention [num_tokens, num_tokens].
+                                         Assumes raw_attn_matrix[i, j] is attention FROM token i TO token j.
         node_token_map (dict): Map from node_idx to list of token_indices.
         num_nodes (int): Number of nodes.
-        method (str): Aggregation method ('average', 'max', 'sum').
 
     Returns:
         torch.Tensor: Node-level attention matrix [num_nodes, num_nodes].
     """
-    node_attn_matrix = torch.zeros((num_nodes, num_nodes), dtype=raw_attn_matrix.dtype)
 
-    for u in range(num_nodes):
-        for v in range(num_nodes):
+    # Initialize on the same device as the input matrix
+    device = raw_attn_matrix.device
+    node_attn_matrix = torch.zeros((num_nodes, num_nodes), dtype=raw_attn_matrix.dtype, device=device)
+
+    for u in range(num_nodes):  # Source node index
+        for v in range(num_nodes):  # Target node index
             u_tokens = node_token_map.get(u, [])
             v_tokens = node_token_map.get(v, [])
 
-            if not u_tokens or not v_tokens:
-                # If a node wasn't found in tokens, its attention is 0
-                node_attn_matrix[u, v] = 0
-                continue
-
-            # Extract the submatrix of attentions between tokens of u and v
-            # Ensure indices are within bounds of raw_attn_matrix
+            # Filter tokens to be within matrix bounds (though usually not needed if map is correct)
             valid_u_tokens = [idx for idx in u_tokens if idx < raw_attn_matrix.shape[0]]
-            valid_v_tokens = [idx for idx in v_tokens if idx < raw_attn_matrix.shape[1]]
+            valid_v_tokens = [idx for idx in v_tokens if idx < raw_attn_matrix.shape[1]] # Assuming square
 
-            if not valid_u_tokens or not valid_v_tokens:
-                 node_attn_matrix[u, v] = 0
-                 continue
-            
-            # Use advanced indexing to get all relevant token-token attentions
-            token_attentions = raw_attn_matrix[valid_u_tokens][:, valid_v_tokens]
+            sum_attentions = torch.tensor(0.0, dtype=raw_attn_matrix.dtype, device=device)
+            count_attentions = 0
 
+            for i in valid_u_tokens:    # i = source token index
+                for j in valid_v_tokens:  # j = target token index
+                    # Apply the causal mask condition: token j must be <= token i
+                    if j <= i:
+                        # Check bounds just in case (should be redundant with valid_ checks)
+                        if i < raw_attn_matrix.shape[0] and j < raw_attn_matrix.shape[1]:
+                            sum_attentions += raw_attn_matrix[i, j]
+                            count_attentions += 1
 
-            if token_attentions.numel() == 0:
-                 node_attn_matrix[u, v] = 0 # Should not happen if valid tokens exist, but safe check
-                 continue
-
-            # Perform aggregation
-            node_attn_matrix[u, v] = torch.mean(token_attentions)
+            if count_attentions > 0:
+                node_attn_matrix[u, v] = sum_attentions / count_attentions
 
     return node_attn_matrix
 
@@ -89,16 +86,41 @@ with open(metadata_path, 'r') as f:
 # have a dictionary of graph_id to all aggregated attention matrices
 aggregate_graphs = {}
 for graph in data:
-    if graph['graph_id'] not in aggregate_graphs:
-        aggregate_graphs[graph['graph_id']] = []
-    rax_matrix_path = graph['attention_matrix_path']
+    graph_id = graph['graph_id']
+    if graph_id not in aggregate_graphs:
+        aggregate_graphs[graph_id] = []
+    raw_matrix_path = graph['attention_matrix_path']
     
-    raw_matrix = np.load(rax_matrix_path)
+    raw_matrix = np.load(raw_matrix_path)
     num_nodes = graph['num_nodes']
     tokens = graph['tokens']
+    source_nodes = graph['source']
+    target_nodes = graph['target']
     
     node_token_map = get_node_token_mapping(tokens, num_nodes)
     aggregate_matrix = aggregate_attention(torch.tensor(raw_matrix), node_token_map, num_nodes)
-    aggregate_graphs[graph['graph_id']].append(aggregate_matrix)
-    
+   
+    NODE_FEATURE_DIM = 16 
+    node_features = torch.ones((num_nodes, NODE_FEATURE_DIM), dtype=torch.float)
+    edge_index_ground_truth = torch.tensor([source_nodes, target_nodes], dtype=torch.long)
 
+    aggregate_graphs[graph_id].append(aggregate_matrix)
+    
+averaged_aggregate_graphs = {}
+print("\nAveraging matrices for each graph_id...")
+
+for graph_id, matrix_list in aggregate_graphs.items():
+    stacked_matrices = torch.stack(matrix_list, dim=0)
+    averaged_matrix = torch.mean(stacked_matrices, dim=0)
+
+    averaged_aggregate_graphs[graph_id] = averaged_matrix
+    print(f"Averaged {len(matrix_list)} matrices for graph_id {graph_id}.")
+
+for graph_id, matrix in averaged_aggregate_graphs.items():
+    save_path = os.path.join(save_dir, f"averaged_id_{graph_id}.pt")
+    torch.save(matrix, save_path)
+    print(f"Saved averaged matrix for graph_id {graph_id} to {save_path}.")
+
+    
+print("done")
+# print(aggregate_graphs)

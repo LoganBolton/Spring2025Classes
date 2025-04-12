@@ -49,3 +49,5 @@ Given the immediate drop to ln(2) and the flatline, the interaction between the 
 - got all the matrixes in every position saved
 - Need to convert from tokens to english matrix
 - THEN average them all 
+
+- YOURE VISUALIZING THE WRONG MATRIX DUMMY

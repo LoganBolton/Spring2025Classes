@@ -5,16 +5,14 @@ author: "Logan Bolton"
 date: "2025-03-30"
 ---
 
-_Acknowledgement:_ This code was created through the repurposing of code found in the lecture notes and through collaboration with ChatGPT-4o and Gemini 2.5 Pro. AI tools were very helpful for me while fixing errors and determining the correct syntax to plot graphs.
+_Acknowledgement:_ This code was created through the repurposing of code found in the lecture notes and through collaboration with Gemini 2.5 Pro. AI tools were very helpful for me while fixing errors and determining the correct syntax to plot graphs.
 
 ```{r setup}
-# knitr::opts_chunk$set(echo = TRUE)
 library('igraph')
 library(poweRlaw)
 library(dplyr)
 library(igraph)
 library(ggplot2) # For plotting
-
 ```
 
 
@@ -122,10 +120,9 @@ grid()
 Show that pk follows a Poisson distribution pk = e^(-c) × c^k/k! by plotting the empirical degree distribution (histogram) and overlay the theoretical Poisson curve.
 
 ```{r}
-n <- 10000      # Number of vertices (n >= 10,000)
-target_c <- 5.0 # Choose a target *theoretical* mean degree c = p(n-1)
+n <- 10000  
+target_c <- 5.0
 
-# Calculate the required edge probability p
 if (n > 1) {
   p <- target_c / (n - 1)
 } else {
@@ -135,99 +132,76 @@ if (n > 1) {
 cat(sprintf("Parameters: n = %d, Target Mean Degree c = %.2f, p = %f\n", n, target_c, p))
 
 # --- Generate G(n, p) Graph ---
-cat("Generating G(n, p) graph...\n")
 g <- sample_gnp(n = n, p = p, directed = FALSE, loops = FALSE)
 cat("Graph generated.\n")
 
 # --- Calculate Empirical Degree Distribution ---
-cat("Calculating degree distribution...\n")
 if (gorder(g) > 0) {
     degrees <- degree(g)
     observed_c <- mean(degrees) # Actual mean degree in this instance
-
-    # Get counts for each degree
-    degree_counts <- table(degrees)
-    # Get the degree values that are present
-    k_values <- as.numeric(names(degree_counts))
-    # Calculate empirical probability pk = count(k) / n
-    pk_empirical <- as.numeric(degree_counts) / n
-
+    max_degree_observed <- if (length(degrees) > 0) max(degrees) else 0
 } else {
     degrees <- numeric(0)
     observed_c <- 0
-    k_values <- numeric(0)
-    pk_empirical <- numeric(0)
+    max_degree_observed <- 0
     warning("Graph has no vertices.")
 }
 
 cat(sprintf("Observed Mean Degree in this sample: %.4f\n", observed_c))
 
-# --- Calculate Theoretical Poisson Distribution ---
-# Use the *target* theoretical mean 'c' for the Poisson lambda
-# Define the range of k values (degrees) to consider for the theoretical plot
-if (length(k_values) > 0) {
-    k_range <- 0:max(k_values)
-} else {
-    k_range <- 0
-}
+k_range <- 0:(max_degree_observed + 2) # Extend range a bit
 
 # Calculate Poisson probabilities P(X=k) = exp(-c) * c^k / k!
 pk_theoretical <- dpois(k_range, lambda = target_c)
 
-cat("Theoretical Poisson probabilities calculated.\n")
-
-# --- Plotting ---
-cat("Generating plot...\n")
-
-# Determine plot limits
-if (length(pk_empirical) > 0 || length(pk_theoretical) > 0) {
-    ylim_max <- max(c(pk_empirical, pk_theoretical), na.rm = TRUE) * 1.1 # Add 10% margin
+if (length(degrees) > 0) {
+    # Define breaks to center integers: 0, 1, 2,... become bins [-0.5, 0.5), [0.5, 1.5), [1.5, 2.5) ...
+    hist_breaks <- seq(-0.5, max(degrees) + 0.5, by = 1)
+    hist_data <- hist(degrees, breaks = hist_breaks, plot = FALSE)
+    # Get the maximum density/probability from histogram and theoretical
+    ylim_max <- max(c(hist_data$density, pk_theoretical), na.rm = TRUE) * 1.1 # Add 10% margin
     xlim_max <- max(k_range)
 } else {
-    ylim_max <- 0.1
-    xlim_max <- 10
+    # Default limits for empty graph case
+    hist_data <- list(density = numeric(0), breaks = c(-0.5, 0.5)) # Dummy data
+    ylim_max <- max(c(0.1, pk_theoretical), na.rm = TRUE) * 1.1 # Ensure theoretical might still show
+    xlim_max <- max(c(10, k_range)) # Sensible default x-limit
 }
 
 
-plot(k_values, pk_empirical,
-     type = "p", # Points
-     pch = 16,   # Solid circles
-     col = "blue",
-     cex = 0.9,
+# Create the base histogram plot
+hist(degrees,
+     breaks = hist_data$breaks, # Use pre-calculated breaks
+     probability = TRUE,       # Y-axis is probability density (equals prob. since width=1)
+     col = "lightblue",        # Color for histogram bars
+     border = "white",         # Color for bar borders
      xlab = "Degree (k)",
      ylab = "Probability (pk)",
      main = paste("Degree Distribution of G(n, p) vs. Poisson\n",
                   sprintf("n=%d, p=%.5f, Theoretical c=%.2f, Observed c=%.3f",
                           n, p, target_c, observed_c)),
-     xlim = c(0, xlim_max),
+     xlim = c(min(hist_data$breaks), xlim_max), # Use breaks min for xlim start
      ylim = c(0, ylim_max),
      cex.lab = 1.2,
      cex.axis = 1.1,
      cex.main = 1.0) # Smaller main title if long
 
-# Overlay the theoretical Poisson probabilities
 points(k_range, pk_theoretical,
-       type = "p",   # Points
        pch = 4,    # Crosses symbol
        col = "red",
        cex = 0.9)
 
-# Optional: Add theoretical curve as lines instead of points
-# lines(k_range, pk_theoretical, type = "l", col = "red", lwd = 1.5)
 
-
-# Add a legend
 legend("topright",
-       legend = c("Empirical pk (Simulation)", paste0("Theoretical Poisson (c = ", target_c, ")")),
-       col = c("blue", "red"),
-       pch = c(16, 4), # Use pch values corresponding to the plots
-       # lty = c(NA, 1), # Use lty if using lines() for theoretical
+       legend = c("Empirical pk (Histogram)", paste0("Theoretical Poisson (c = ", target_c, ")")),
+       fill = c("lightblue", NA),  # Color fill for histogram bar in legend
+       border = c("black", NA),    # Border for histogram bar in legend
+       pch = c(NA, 4),             # Symbol for theoretical points
+       col = c(NA, "red"),         # Color for theoretical points
+       pt.cex = c(NA, 0.9),        # Size for theoretical points symbol in legend
        bg="white")
 
-# Add grid lines
 grid()
-
-cat("Plot generated.\n")
 ```
 
 ### c) Clustering Coefficients
@@ -247,8 +221,6 @@ p_values <- seq(1/n, 10/n, length.out = num_p_values)
 avg_local_cc_observed <- numeric(length(p_values))
 global_cc_observed <- numeric(length(p_values))
 
-# --- Computational Experiment ---
-cat("Running simulation for n =", n, "...\n")
 for (i in 1:length(p_values)) {
   p <- p_values[i]
 
@@ -275,7 +247,6 @@ for (i in 1:length(p_values)) {
   }
 
 }
-cat("Simulation finished.\n\n")
 
 # --- Verification ---
 cat("--- Verification Summary ---\n")
@@ -372,7 +343,7 @@ p_values <- alpha_values * p_c
 avg_relative_largest_comp_size <- numeric(length(alpha_values))
 
 # --- Computational Experiment ---
-cat(sprintf("Running simulations for n=%d. Theoretical threshold p_c ≈ %.6f (alpha=1)\n", n, p_c))
+cat(sprintf("Running simulations for n=%d. Theoretical threshold p_c ~= %.6f (alpha=1)\n", n, p_c))
 
 for (i in 1:length(alpha_values)) {
   p <- p_values[i]
@@ -711,15 +682,10 @@ for (i in 1:length(c_values)) {
    if(is.nan(observed_frac_trees[i])) observed_frac_trees[i] <- NA
 
 
-  # Optional: Print progress
-  cat(sprintf("c = %.3f | Obs R: %.3f | Th R: %.3f | Obs Tree Frac: %.4f\n",
-              c_current, observed_avg_R[i], theoretical_R[i], observed_frac_trees[i]))
-
 } # End outer loop (over c values)
 cat("Simulation finished.\n\n")
 
 
-# --- Verification & Reporting ---
 cat("--- Verification Summary ---\n")
 
 cat("Fraction of Small Components that are Trees:\n")
@@ -994,12 +960,7 @@ Show that the diameter of G(n, p) follows: diameter = A + ln(n)/ln(c) where A is
 ```{r}
 target_c <- 5.0
 
-# Choose a range of n values
-# Note: Diameter calculation is slow for large n. Start smaller, increase if feasible.
-# Let's try a logarithmic scale for n initially, maybe refine later
-# n_values <- floor(10^seq(2.5, 3.7, length.out = 8)) # e.g., ~316 to ~5011
-n_values <- floor(seq(500, 5000, length.out = 10)) # Linear scale
-# n_values <- c(1000, 2000, 4000, 8000, 10000) # Specific large values
+n_values <- c(10000, 15000, 20000, 25000, 30000) # Linear scale
 
 # Number of replicates for each n to average out randomness
 num_replicates <- 5 # Increase if results are too noisy and time permits
@@ -1337,12 +1298,238 @@ print(plot_deg_hist)
 Analyze some basic network properties of G*.
 
 ```{r}
+num_nodes_star <- vcount(G_star)
+print(paste("G* Order (Number of Nodes):", num_nodes_star))
 
+# 2. Size (Number of Edges)
+# Should be the same as the original graph because the degree sequence sum is preserved
+num_edges_star <- ecount(G_star)
+print(paste("G* Size (Number of Edges):", num_edges_star))
+
+# 3. Density
+# Density = E / E_max, where E is the number of edges, E_max is the max possible edges.
+# For an undirected graph without loops, E_max = N * (N - 1) / 2
+# Should be the same as the original graph if N and E are the same.
+graph_density_star <- edge_density(G_star)
+print(paste("G* Density:", sprintf("%.6f", graph_density_star))) # Format for readability
+
+# 4. Connectivity
+is_connected_star <- is_connected(G_star)
+print(paste("Is G* connected?", is_connected_star))
+
+if (!is_connected_star) {
+  components_info_star <- components(G_star)
+  num_components_star <- components_info_star$no
+  print(paste("G* Number of connected components:", num_components_star))
+
+  # Size of the largest component in G*
+  lcc_size_star <- max(components_info_star$csize)
+  print(paste("G* Size of the largest connected component (LCC):", lcc_size_star))
+
+  # Fraction of vertices in the largest component in G*
+  fraction_in_lcc_star <- lcc_size_star / num_nodes_star
+  print(paste("G* Fraction of vertices in LCC:", sprintf("%.4f", fraction_in_lcc_star)))
+} else {
+  print("G* is connected, consisting of a single component.")
+  # If connected, LCC size is total nodes, fraction is 1.
+  lcc_size_star <- num_nodes_star
+  fraction_in_lcc_star <- 1.0
+  print(paste("G* Size of the largest connected component (LCC):", lcc_size_star))
+  print(paste("G* Fraction of vertices in LCC:", sprintf("%.4f", fraction_in_lcc_star)))
+}
+
+# 5. Clustering Coefficient (Transitivity)
+# Global clustering coefficient (transitivity)
+global_cc_star <- transitivity(G_star, type = "global")
+
+# Average clustering coefficient
+# Note: transitivity(type="average") might return NaN if degrees are low or graph is small.
+# A more robust way is often to calculate local CC for each node and average non-NaN values.
+local_cc_vector_star <- transitivity(G_star, type = "local")
+average_cc_star <- mean(local_cc_vector_star, na.rm = TRUE) # Average excluding NaNs
+
+print(paste("G* Global Clustering Coefficient (Transitivity):", sprintf("%.4f", global_cc_star)))
+print(paste("G* Average Clustering Coefficient:", sprintf("%.4f", average_cc_star)))
+
+
+# Store results for potential later use or comparison
+basic_properties_star <- list(
+  order = num_nodes_star,
+  size = num_edges_star,
+  density = graph_density_star,
+  is_connected = is_connected_star,
+  num_components = if (!is_connected_star) components_info_star$no else 1,
+  lcc_size = lcc_size_star,
+  fraction_in_lcc = fraction_in_lcc_star,
+  global_clustering_coeff = global_cc_star,
+  average_clustering_coeff = average_cc_star
+)
+
+print("--- Analysis of G* complete ---")
+
+if (exists("basic_properties")) {
+    print("--- Comparison G vs G* ---")
+    print(paste("Order: G =", basic_properties$order))
+    print(paste("Size: G =", basic_properties$size))
+    print(paste("Density: G =", sprintf("%.6f", basic_properties$density)))
+    print(paste("Connected: G =", basic_properties$is_connected))
+    print(paste("# Components: G =", basic_properties$num_components))
+    print(paste("LCC Fraction: G =", sprintf("%.4f", basic_properties$fraction_in_lcc)))
+    print(paste("Global CC: G =", sprintf("%.4f", basic_properties$global_clustering_coeff)))
+    print(paste("Average CC: G =", sprintf("%.4f", basic_properties$average_clustering_coeff)))
+    print("--------------------------")
+}
 ```
 
 ### d) Compare networks
 identify similarities and differences between G and G*.
 ```{r}
+if (exists("basic_properties")) {
+    print("--- Comparison G vs G* ---")
+    print(paste("Order: G =", basic_properties$order, ", G* =", basic_properties_star$order))
+    print(paste("Size: G =", basic_properties$size, ", G* =", basic_properties_star$size))
+    print(paste("Density: G =", sprintf("%.6f", basic_properties$density), ", G* =", sprintf("%.6f", basic_properties_star$density)))
+    print(paste("Connected: G =", basic_properties$is_connected, ", G* =", basic_properties_star$is_connected))
+    print(paste("# Components: G =", basic_properties$num_components, ", G* =", basic_properties_star$num_components))
+    print(paste("LCC Fraction: G =", sprintf("%.4f", basic_properties$fraction_in_lcc), ", G* =", sprintf("%.4f", basic_properties_star$fraction_in_lcc)))
+    print(paste("Global CC: G =", sprintf("%.4f", basic_properties$global_clustering_coeff), ", G* =", sprintf("%.4f", basic_properties_star$global_clustering_coeff)))
+    print(paste("Average CC: G =", sprintf("%.4f", basic_properties$average_clustering_coeff), ", G* =", sprintf("%.4f", basic_properties_star$average_clustering_coeff)))
+    print("--------------------------")
+}
+```
+```{r}
+print("--- Calculating Assortativity ---")
+assort_g <- assortativity_degree(g_undir, directed = FALSE)
+assort_g_star <- assortativity_degree(G_star, directed = FALSE)
 
+print(paste("Assortativity (G):", sprintf("%.4f", assort_g)))
+print(paste("Assortativity (G*):", sprintf("%.4f", assort_g_star)))
+print("Interpretation: Positive values indicate assortativity (high-degree nodes connect to high-degree nodes). Negative values indicate disassortativity. Values near zero indicate neutrality.")
+print("---------------------------------")
+
+# --- 2. Average Path Length ---
+print("--- Calculating Average Path Length (may take time) ---")
+
+avg_path_g <- mean_distance(g_undir, directed = FALSE)
+avg_path_g_star <- mean_distance(G_star, directed = FALSE)
+
+print(paste("Average Path Length (G):", sprintf("%.4f", avg_path_g)))
+print(paste("Average Path Length (G*):", sprintf("%.4f", avg_path_g_star)))
+
+
+# --- 3. Diameter ---
+print("--- Calculating Diameter (may take time) ---")
+diam_g <- diameter(g_undir, directed = FALSE, unconnected = TRUE)
+diam_g_star <- diameter(G_star, directed = FALSE, unconnected = TRUE)
+
+print(paste("Diameter (G):", diam_g))
+print(paste("Diameter (G*):", diam_g_star))
+print("(Note: For disconnected graphs, diameter is often calculated for the LCC or reported as Inf)")
+print("---------------------------------")
+
+
+# --- 4. Centrality Distributions ---
+print("--- Calculating Centrality Distributions (may take time) ---")
+
+# a) Betweenness Centrality
+print("Calculating Betweenness...")
+btw_g <- betweenness(g_undir, directed = FALSE, normalized = TRUE)
+btw_g_star <- betweenness(G_star, directed = FALSE, normalized = TRUE)
+
+# b) Closeness Centrality
+print("Calculating Closeness...")
+close_g <- closeness(g_undir, mode = "total", normalized = TRUE)
+close_g_star <- closeness(G_star, mode = "total", normalized = TRUE)
+
+# c) Eigenvector Centrality
+print("Calculating Eigenvector...")
+eig_g_result <- eigen_centrality(g_undir, directed = FALSE, scale = TRUE)
+eig_g_star_result <- eigen_centrality(G_star, directed = FALSE, scale = TRUE)
+eig_g <- eig_g_result$vector
+eig_g_star <- eig_g_star_result$vector
+
+
+# --- Plotting Centrality Distributions ---
+print("Plotting Centrality Distributions...")
+
+# Combine data for plotting
+centrality_df <- data.frame(
+  Value = c(btw_g, btw_g_star, close_g, close_g_star, eig_g, eig_g_star),
+  Centrality = factor(rep(c("Betweenness", "Closeness", "Eigenvector"),
+                           each = length(btw_g) + length(btw_g_star))),
+  Network = factor(rep(rep(c("Original (G)", "Configuration (G*)"), each = length(btw_g)), 3),
+                    levels = c("Original (G)", "Configuration (G*)"))
+)
+
+# Plotting (using density plots, add + small constant for log scale if needed)
+plot_centrality <- ggplot(centrality_df, aes(x = Value + 1e-9, color = Network)) + # Add small value for log scale
+  geom_density(alpha = 0.7, linewidth=1.0, adjust=0.5) +
+  scale_x_log10(breaks = scales::trans_breaks("log10", function(x) 10^x),
+                labels = scales::trans_format("log10", scales::math_format(10^.x))) +
+  facet_wrap(~ Centrality, scales = "free") + 
+  labs(
+    title = "Centrality Distributions Comparison",
+    x = "Normalized Centrality Value (log scale)",
+    y = "Density",
+    color = "Network Type"
+  ) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  annotation_logticks(sides = "b") 
+
+print(plot_centrality)
+print("---------------------------------")
+
+
+# --- 5. Community Detection ---
+print("--- Performing Community Detection (Louvain) ---")
+
+# Run Louvain algorithm
+comm_g <- cluster_louvain(g_undir)
+comm_g_star <- cluster_louvain(G_star)
+
+# Compare Modularity
+mod_g <- modularity(comm_g)
+mod_g_star <- modularity(comm_g_star)
+print(paste("Modularity (G):", sprintf("%.4f", mod_g)))
+print(paste("Modularity (G*):", sprintf("%.4f", mod_g_star)))
+print("Higher modularity suggests stronger community structure.")
+
+# Compare Number of Communities
+num_comm_g <- length(sizes(comm_g))
+num_comm_g_star <- length(sizes(comm_g_star))
+print(paste("Number of Communities (G):", num_comm_g))
+print(paste("Number of Communities (G*):", num_comm_g_star))
+
+# Compare Community Size Distributions
+sizes_g <- sizes(comm_g)
+sizes_g_star <- sizes(comm_g_star)
+
+community_size_df <- data.frame(
+  Size = c(as.numeric(sizes_g), as.numeric(sizes_g_star)),
+  Network = factor(rep(c("Original (G)", "Configuration (G*)"),
+                       times = c(length(sizes_g), length(sizes_g_star))),
+                   levels = c("Original (G)", "Configuration (G*)"))
+)
+
+# Plotting community size distributions (histogram often works well)
+plot_comm_sizes <- ggplot(community_size_df, aes(x = Size, fill = Network)) +
+  geom_histogram(binwidth = 1, position = "identity", alpha = 0.7) + # Adjust binwidth as needed
+  scale_x_log10(breaks = scales::trans_breaks("log10", function(x) 10^x),
+                 labels = scales::trans_format("log10", scales::math_format(10^.x))) +
+  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x),
+                 labels = scales::trans_format("log10", scales::math_format(10^.x))) +
+  labs(
+    title = "Community Size Distribution",
+    x = "Community Size (log scale)",
+    y = "Count (log scale)",
+    fill = "Network Type"
+  ) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  annotation_logticks() +
+  facet_wrap(~Network, ncol=1) # Separate panels often clearer for histograms
+
+print(plot_comm_sizes)
 ```
 

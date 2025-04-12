@@ -107,12 +107,13 @@ for graph_id in range(NUM_GRAPHS):
         # Extract attention maps for all layers
         num_layers = len(attentions)
         attention_matrix = attentions[0][0].detach().numpy()
-        # Retain only the top 3 values in each row
-        for row in attention_matrix:
-            top_indices = np.argpartition(row, -3)[-3:]
-            top_values = row[top_indices]
-            row.fill(0)  # Zero out the row
-            row[top_indices] = top_values  # Set top 3 values
+
+        # Retain only the top 3 values in each row - COMMENTED OUT FOR RN
+        # for row in attention_matrix:
+        #     top_indices = np.argpartition(row, -3)[-3:]
+        #     top_values = row[top_indices]
+        #     row.fill(0)  # Zero out the row
+        #     row[top_indices] = top_values  # Set top 3 values
 
         # Average across heads
         avg_attention_matrix = np.mean(attention_matrix, axis=0)
