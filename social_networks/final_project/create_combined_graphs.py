@@ -1,12 +1,12 @@
 import torch
 import numpy as np
-from transformers import LlamaForCausalLM, AutoTokenizer
 from torch_geometric.data import Data
-import random
 import os
 import json
 import pandas as pd
 import string
+from collections import defaultdict # Import defaultdict for easier grouping
+
 
 def get_node_token_mapping(tokens, num_nodes):
     """
@@ -85,8 +85,11 @@ with open(metadata_path, 'r') as f:
 # convert each one to aggregated attention matrix (tokens to english)
 # have a dictionary of graph_id to all aggregated attention matrices
 aggregate_graphs = {}
+original_metadata_grouped = defaultdict(list) # Stores original metadata dicts grouped by id
+
 for graph in data:
     graph_id = graph['graph_id']
+    original_metadata_grouped[graph_id].append(graph)
     if graph_id not in aggregate_graphs:
         aggregate_graphs[graph_id] = []
     raw_matrix_path = graph['attention_matrix_path']
@@ -106,9 +109,8 @@ for graph in data:
 
     aggregate_graphs[graph_id].append(aggregate_matrix)
     
+# averages the aggregated matrices for each graph_id
 averaged_aggregate_graphs = {}
-print("\nAveraging matrices for each graph_id...")
-
 for graph_id, matrix_list in aggregate_graphs.items():
     stacked_matrices = torch.stack(matrix_list, dim=0)
     averaged_matrix = torch.mean(stacked_matrices, dim=0)
@@ -116,11 +118,52 @@ for graph_id, matrix_list in aggregate_graphs.items():
     averaged_aggregate_graphs[graph_id] = averaged_matrix
     print(f"Averaged {len(matrix_list)} matrices for graph_id {graph_id}.")
 
-for graph_id, matrix in averaged_aggregate_graphs.items():
-    save_path = os.path.join(save_dir, f"averaged_id_{graph_id}.pt")
-    torch.save(matrix, save_path)
-    print(f"Saved averaged matrix for graph_id {graph_id} to {save_path}.")
+new_metadata_list = []
+combined_metadata_save_path = os.path.join(save_dir, 'combined_metadata.json') # Path for the new metadata file
 
+print("\nSaving averaged matrices and creating combined metadata...")
+
+# save new averaged, aggregated matrices to simple adjacency matrix
+# also put it all in a nice metadata file
+for graph_id, averaged_matrix in averaged_aggregate_graphs.items():
+    # --- Save the averaged matrix ---
+    save_path = os.path.join(save_dir, f"averaged_id_{graph_id}.pt")
+    try:
+        torch.save(averaged_matrix, save_path)
+        print(f"Saved averaged matrix for graph_id {graph_id} to {save_path}.")
+    except Exception as e:
+        print(f"Error saving averaged matrix for graph_id {graph_id} to {save_path}: {e}")
+        continue # Skip metadata creation if saving failed
+
+    # --- Create the new metadata entry ---
+    # 1. Get a representative metadata entry (e.g., the first one for this graph_id)
+    representative_meta = original_metadata_grouped[graph_id][0].copy() # Use copy to avoid modifying the original
+
+    # 2. Get all original attention matrix paths for this graph_id
+    original_paths = [meta['attention_matrix_path'] for meta in original_metadata_grouped[graph_id]]
+
+    # 3. Remove the old specific attention matrix path
+    if 'attention_matrix_path' in representative_meta:
+        del representative_meta['attention_matrix_path']
+
+    # 4. Add the new fields
+    representative_meta['averaged_attention_matrix_path'] = os.path.relpath(save_path, start=os.path.dirname(combined_metadata_save_path)) # Store relative path
+    # Or use absolute path: representative_meta['averaged_attention_matrix_path'] = os.path.abspath(save_path)
+    representative_meta['original_attention_matrix_paths'] = original_paths
+    representative_meta['num_averaged_samples'] = len(original_paths) # Add count of averaged graphs
+
+    # 5. Add the new metadata entry to our list
+    new_metadata_list.append(representative_meta)
+
+# --- Save the new combined metadata ---
+if new_metadata_list:
+    try:
+        with open(combined_metadata_save_path, 'w') as f:
+            json.dump(new_metadata_list, f, indent=2)
+        print(f"\nSaved combined metadata for {len(new_metadata_list)} graph IDs to {combined_metadata_save_path}.")
+    except Exception as e:
+        print(f"Error saving combined metadata to {combined_metadata_save_path}: {e}")
+else:
+    print("\nNo averaged graphs were successfully processed and saved, so no combined metadata file was created.")
     
 print("done")
-# print(aggregate_graphs)
