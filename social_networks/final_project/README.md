@@ -16,8 +16,10 @@ Other Arxiv papers have shown that you can train a transformer to reverse engine
 
 ## Setup
 ### Data
+**create_graphs.py**
 - Generate an adjacency matrix for a directed graph
 - Generate every equivalent form of that graph in text format
+**create_combined_graphs.py**
 - Extract the attention from an LLM on all heads/layers with these prompts
 - Condense token attention to just the attention to and from each node
 - Average across all these graphs
