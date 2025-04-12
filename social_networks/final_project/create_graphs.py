@@ -63,12 +63,11 @@ def create_gt_adjacency(source, target, num_nodes):
     
     return matrix
     
-num_nodes = 6
-max_possible_connections = num_nodes*(num_nodes-1)
+num_nodes = 10
 P_CONNECTION = 0.25
 NUM_GRAPHS = 200
 
-source_dir = 'attention_matrices/arg_3'
+source_dir = 'attention_matrices/no_args_10'
 metadata_path = f'{source_dir}/metadata.json'
 if not os.path.exists(source_dir):
     os.makedirs(source_dir)
