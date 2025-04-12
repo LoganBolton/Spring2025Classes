@@ -21,7 +21,6 @@ num_nodes = 10
 max_possible_connections = num_nodes*(num_nodes-1)
 P_CONNECTION = 0.25
 NUM_GRAPHS = 1
-# metadata_path = 'attention_matrices/arg_3_avg/metadata.json'
 source_dir = 'attention_matrices/demo1'
 metadata_path = f'{source_dir}/metadata.json'
 
@@ -70,23 +69,8 @@ for graph_id in range(NUM_GRAPHS):
     #         if random.random() < P_CONNECTION:
     #             source.append(node_1)
     #             target.append(node_2)
-            
-            
-    # # print(source, target)
-    # alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    # prompt = ""
-    # for i in range(len(source)):
-    #     source_node = alphabet[source[i]]
-    #     target_node = alphabet[target[i]]
-    #     prompt += f"{source_node}->{target_node}\n"
-    # if prompt == "":      
     source = [0, 0, 2, 3, 4]
     target = [1, 2, 1, 1, 3]
-    # prompt = """A -> B
-    # A -> C
-    # C -> B
-    # D -> B
-    # E -> D"""
     
     sources, targets = create_pertubations(source, target)
     prompts = create_prompts(sources, targets)
@@ -104,7 +88,7 @@ for graph_id in range(NUM_GRAPHS):
             outputs = model(**inputs)
         attentions = outputs.attentions
 
-        ################ WORKING CODE
+        ################ WORKING CODE NO TOP ARGS
         # Extract attention maps for all layers
         num_layers = len(attentions)
         attention_matrix = attentions[0][0].detach().numpy()

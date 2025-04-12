@@ -1,0 +1,58 @@
+[
+  {
+    "graph_id": 0,
+    "max_nodes": 10,
+    "num_nodes": 5,
+    "num_edges": 5,
+    "connection_probability": 0.25,
+    "layer": "0",
+    "head": "all",
+    "source": [
+      0,
+      0,
+      2,
+      3,
+      4
+    ],
+    "target": [
+      1,
+      2,
+      1,
+      1,
+      3
+    ],
+    "tokens": [
+      "<|begin_of_text|>",
+      "A",
+      "->",
+      "B",
+      "\u010a",
+      "A",
+      "->",
+      "C",
+      "\u010a",
+      "C",
+      "->",
+      "B",
+      "\u010a",
+      "D",
+      "->",
+      "B",
+      "\u010a",
+      "E",
+      "->",
+      "D",
+      "\u010a"
+    ],
+    "prompt": "A->B\nA->C\nC->B\nD->B\nE->D\n",
+    "averaged_attention_matrix_path": "averaged_id_0.pt",
+    "original_attention_matrix_paths": [
+      "attention_matrices/demo1/avg_attn_0_0.npy",
+      "attention_matrices/demo1/avg_attn_0_1.npy",
+      "attention_matrices/demo1/avg_attn_0_2.npy",
+      "attention_matrices/demo1/avg_attn_0_3.npy",
+      "attention_matrices/demo1/avg_attn_0_4.npy"
+    ],
+    "num_averaged_samples": 5
+  }
+]
