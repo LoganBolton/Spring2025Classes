@@ -95,16 +95,17 @@ for graph in data:
     raw_matrix_path = graph['attention_matrix_path']
     
     raw_matrix = np.load(raw_matrix_path)
-    num_nodes = graph['num_nodes']
+    # num_nodes = graph['num_nodes']
+    max_nodes = graph['max_nodes']
     tokens = graph['tokens']
     source_nodes = graph['source']
     target_nodes = graph['target']
     
-    node_token_map = get_node_token_mapping(tokens, num_nodes)
-    aggregate_matrix = aggregate_attention(torch.tensor(raw_matrix), node_token_map, num_nodes)
+    node_token_map = get_node_token_mapping(tokens, max_nodes)
+    aggregate_matrix = aggregate_attention(torch.tensor(raw_matrix), node_token_map, max_nodes)
    
     NODE_FEATURE_DIM = 16 
-    node_features = torch.ones((num_nodes, NODE_FEATURE_DIM), dtype=torch.float)
+    node_features = torch.ones((max_nodes, NODE_FEATURE_DIM), dtype=torch.float)
     edge_index_ground_truth = torch.tensor([source_nodes, target_nodes], dtype=torch.long)
 
     aggregate_graphs[graph_id].append(aggregate_matrix)
@@ -156,14 +157,8 @@ for graph_id, averaged_matrix in averaged_aggregate_graphs.items():
     new_metadata_list.append(representative_meta)
 
 # --- Save the new combined metadata ---
-if new_metadata_list:
-    try:
-        with open(combined_metadata_save_path, 'w') as f:
-            json.dump(new_metadata_list, f, indent=2)
-        print(f"\nSaved combined metadata for {len(new_metadata_list)} graph IDs to {combined_metadata_save_path}.")
-    except Exception as e:
-        print(f"Error saving combined metadata to {combined_metadata_save_path}: {e}")
-else:
-    print("\nNo averaged graphs were successfully processed and saved, so no combined metadata file was created.")
-    
+with open(combined_metadata_save_path, 'w') as f:
+    json.dump(new_metadata_list, f, indent=2)
+print(f"\nSaved combined metadata for {len(new_metadata_list)} graph IDs to {combined_metadata_save_path}.")
+
 print("done")

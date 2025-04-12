@@ -46,8 +46,12 @@ Given the immediate drop to ln(2) and the flatline, the interaction between the 
 
 
 # WIP TODO
-- got all the matrixes in every position saved
-- Need to convert from tokens to english matrix
-- THEN average them all 
+- add a gt matrix 
 
-- YOURE VISUALIZING THE WRONG MATRIX DUMMY
+
+# Random
+Right now I'm looking at every node, no matter its position. Maybe its best to only look at nodes that come before arrow token? maybe after?
+- If it sucks
+    - Change from all nodes to just looking at parent or child nodes
+    - Kinda more boring though
+    - Hope it can get both
