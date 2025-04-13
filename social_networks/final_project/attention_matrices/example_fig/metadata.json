@@ -1,0 +1,161 @@
+[
+  {
+    "graph_id": 0,
+    "attention_matrix_path": "attention_matrices/example_fig/avg_attn_0_0.npy",
+    "max_nodes": 3,
+    "num_nodes": 3,
+    "num_edges": 3,
+    "connection_probability": 0.25,
+    "layer": "0",
+    "head": "all",
+    "gt_adjacency": [
+      [
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        0
+      ]
+    ],
+    "source": [
+      0,
+      1,
+      2
+    ],
+    "target": [
+      1,
+      2,
+      0
+    ],
+    "tokens": [
+      "<|begin_of_text|>",
+      "A",
+      "->",
+      "B",
+      "\u010a",
+      "B",
+      "->",
+      "C",
+      "\u010a",
+      "C",
+      "->",
+      "A",
+      "\u010a"
+    ],
+    "prompt": "A->B\nB->C\nC->A\n"
+  },
+  {
+    "graph_id": 0,
+    "attention_matrix_path": "attention_matrices/example_fig/avg_attn_0_1.npy",
+    "max_nodes": 3,
+    "num_nodes": 3,
+    "num_edges": 3,
+    "connection_probability": 0.25,
+    "layer": "0",
+    "head": "all",
+    "gt_adjacency": [
+      [
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        0
+      ]
+    ],
+    "source": [
+      1,
+      2,
+      0
+    ],
+    "target": [
+      2,
+      0,
+      1
+    ],
+    "tokens": [
+      "<|begin_of_text|>",
+      "B",
+      "->",
+      "C",
+      "\u010a",
+      "C",
+      "->",
+      "A",
+      "\u010a",
+      "A",
+      "->",
+      "B",
+      "\u010a"
+    ],
+    "prompt": "B->C\nC->A\nA->B\n"
+  },
+  {
+    "graph_id": 0,
+    "attention_matrix_path": "attention_matrices/example_fig/avg_attn_0_2.npy",
+    "max_nodes": 3,
+    "num_nodes": 3,
+    "num_edges": 3,
+    "connection_probability": 0.25,
+    "layer": "0",
+    "head": "all",
+    "gt_adjacency": [
+      [
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        0
+      ]
+    ],
+    "source": [
+      2,
+      0,
+      1
+    ],
+    "target": [
+      0,
+      1,
+      2
+    ],
+    "tokens": [
+      "<|begin_of_text|>",
+      "C",
+      "->",
+      "A",
+      "\u010a",
+      "A",
+      "->",
+      "B",
+      "\u010a",
+      "B",
+      "->",
+      "C",
+      "\u010a"
+    ],
+    "prompt": "C->A\nA->B\nB->C\n"
+  }
+]

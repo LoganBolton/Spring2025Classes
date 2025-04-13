@@ -16,14 +16,15 @@ from tqdm import tqdm
 import pandas as pd
 
 # --- Configuration Parameters ---
-RUN_PATH = 'attention_matrices/no_args_6/combined'
+RUN_PATH = 'attention_matrices/no_args_7_1b/combined'
 METADATA_PATH = f'/Users/log/Github/Spring2025Classes/social_networks/final_project/{RUN_PATH}/combined_metadata.json'
 DATA_DIR = f'/Users/log/Github/Spring2025Classes/social_networks/final_project/'
 EPOCHS = 200
-LEARNING_RATE = 0.002
-BATCH_SIZE = 8
-HIDDEN_CHANNELS = 2048 # MLP might need more capacity
+LEARNING_RATE = 0.001
+BATCH_SIZE = 128
+HIDDEN_CHANNELS = 4096 # MLP might need more capacity
 TEST_SPLIT = 0.2
+VAL_SPLIT = 0.1 # 10% of the original training data
 RANDOM_SEED = 42
 # --- MODIFIED: Changed output directory name ---
 OUTPUT_DIR = f'{RUN_PATH}/mlp_baseline_training_output'

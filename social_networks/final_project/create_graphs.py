@@ -8,6 +8,7 @@ import json
 
 # Load Llama Model
 model_name = "meta-llama/Llama-3.2-1B"
+# model_name = "meta-llama/Llama-3.2-3B"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = LlamaForCausalLM.from_pretrained(
     model_name,
@@ -63,11 +64,11 @@ def create_gt_adjacency(source, target, num_nodes):
     
     return matrix
     
-num_nodes = 10
+num_nodes = 3
 P_CONNECTION = 0.25
-NUM_GRAPHS = 200
+NUM_GRAPHS = 1
 
-source_dir = 'attention_matrices/no_args_10'
+source_dir = 'attention_matrices/example_fig'
 metadata_path = f'{source_dir}/metadata.json'
 if not os.path.exists(source_dir):
     os.makedirs(source_dir)
@@ -75,19 +76,22 @@ if not os.path.exists(source_dir):
 
 for graph_id in range(NUM_GRAPHS):
     # Generate random GT adjacency matrix
-    source = []
-    target = []
-    for node_1 in range(num_nodes):
-        for node_2 in range(num_nodes-1):
-            if node_1 == node_2:
-                continue
-            if random.random() < P_CONNECTION:
-                source.append(node_1)
-                target.append(node_2)
+    # source = []
+    # target = []
+    # for node_1 in range(num_nodes):
+    #     for node_2 in range(num_nodes-1):
+    #         if node_1 == node_2:
+    #             continue
+    #         if random.random() < P_CONNECTION:
+    #             source.append(node_1)
+    #             target.append(node_2)
+    source = [0, 1, 2]
+    target = [1, 2, 0]
     
     sources, targets = create_pertubations(source, target)
     prompts = create_prompts(sources, targets)
     gt_adjacency = create_gt_adjacency(source, target, num_nodes)
+    
     
     # Generate all variations of a graph
     for i in range(len(prompts)):

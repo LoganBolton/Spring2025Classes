@@ -69,7 +69,7 @@ def aggregate_attention(raw_attn_matrix, node_token_map, num_nodes):
 
     return node_attn_matrix
 
-source_dir = 'attention_matrices/no_args_10'
+source_dir = 'attention_matrices/example_fig'
 metadata_path = f'{source_dir}/metadata.json'
 save_dir = f'{source_dir}/combined'
 if not os.path.exists(save_dir):

@@ -19,11 +19,9 @@ model = LlamaForCausalLM.from_pretrained(
 )
 
 # Step 2: Prepare input text
-text = """A -> B
-A -> C
-C -> B
-D -> B
-E -> D"""
+text = """A->B
+B->C
+C->A"""
 # text = """A to B
 # A to C
 # C to B

@@ -46,15 +46,7 @@ Given the immediate drop to ln(2) and the flatline, the interaction between the 
 
 
 # WIP TODO
-- add a gt matrix 
-
-
-# Random
-Right now I'm looking at every node, no matter its position. Maybe its best to only look at nodes that come before arrow token? maybe after?
-- If it sucks
-    - Change from all nodes to just looking at parent or child nodes
-    - Kinda more boring though
-    - Hope it can get both
+- Change eval so that it uses the same test/val split
 
 
 
@@ -117,3 +109,176 @@ epoch,train_loss,test_loss,test_accuracy,test_f1
 
 ### no args
 Epoch: 200, Train Loss: 0.4577, Test Loss: 0.6107, Test Acc: 0.5769, Test F1: 0.4366
+
+## size 7
+### 1000 training, no args, no val
+Best Test F1 Score: 0.7275 at Epoch 190
+Training history saved to attention_matrices/no_args_7_1b/combined/mlp_baseline_training_output/training_history.csv
+
+--- Final Evaluation on Test Set using Best Model ---
+Final Results - Test Loss: 0.3801, Test Acc (non-diag): 0.7752, Test F1 (non-diag): 0.7275
+
+**with good params**
+EPOCHS = 200
+LEARNING_RATE = 0.001
+BATCH_SIZE = 32
+HIDDEN_CHANNELS = 4096 # MLP might need more capacity
+TEST_SPLIT = 0.2
+RANDOM_SEED = 42
+
+--- Training Complete ---
+Best Test F1 Score: 0.8519 at Epoch 200
+Training history saved to attention_matrices/no_args_7_1b/combined/mlp_baseline_training_output/training_history.csv
+
+--- Final Evaluation on Test Set using Best Model ---
+Final Results - Test Loss: 0.2988, Test Acc (non-diag): 0.8829, Test F1 (non-diag): 0.8519
+
+
+--- Final Evaluation on Test Set using Best Model ---
+Final Results - Test Loss: 0.2393, Test Acc (non-diag): 0.9031, Test F1 (non-diag): 0.8776
+
+keep it at 128
+
+
+# best training run
+
+EPOCHS = 200
+LEARNING_RATE = 0.001
+BATCH_SIZE = 128
+HIDDEN_CHANNELS = 4096 # MLP might need more capacity
+TEST_SPLIT = 0.2
+VAL_SPLIT = 0.1 # 10% of the original training data
+RANDOM_SEED = 42
+
+
+--- Training Complete ---
+Best Test F1 Score: 0.8816 at Epoch 187
+Training history saved to attention_matrices/no_args_7_1b/combined/mlp_baseline_training_output/training_history.csv
+
+--- Final Evaluation on Test Set using Best Model ---
+Final Results - Test Loss: 0.2136, Test Acc (non-diag): 0.9064, Test F1 (non-diag): 0.8816
+
+--- Sample Predictions from Test Set (using best model) ---
+
+--- Example 1 (Graph ID: 521) ---
+Ground Truth Adjacency (Undirected):
+[[0 1 0 0 0 1 1]
+ [1 0 1 0 0 0 1]
+ [0 1 0 0 0 0 0]
+ [0 0 0 0 1 1 1]
+ [0 0 0 1 0 0 0]
+ [1 0 0 1 0 0 0]
+ [1 1 0 1 0 0 0]]
+
+Predicted Adjacency:
+[[0 0 0 1 0 0 1]
+ [0 0 1 0 0 0 1]
+ [0 1 0 0 0 0 0]
+ [1 0 0 0 1 1 1]
+ [0 0 0 1 0 0 0]
+ [0 0 0 1 0 0 0]
+ [1 1 0 1 0 0 0]]
+--------------------
+
+--- Example 2 (Graph ID: 737) ---
+Ground Truth Adjacency (Undirected):
+[[0 0 1 1 0 0 0]
+ [0 0 0 0 0 0 0]
+ [1 0 0 1 0 0 0]
+ [1 0 1 0 0 1 0]
+ [0 0 0 0 0 0 0]
+ [0 0 0 1 0 0 0]
+ [0 0 0 0 0 0 0]]
+
+Predicted Adjacency:
+[[0 0 1 1 0 0 0]
+ [0 0 0 0 0 0 0]
+ [1 0 0 1 0 1 0]
+ [1 0 1 0 0 0 0]
+ [0 0 0 0 0 0 0]
+ [0 0 1 0 0 0 0]
+ [0 0 0 0 0 0 0]]
+--------------------
+
+--- Example 3 (Graph ID: 740) ---
+Ground Truth Adjacency (Undirected):
+[[0 1 0 0 0 0 0]
+ [1 0 1 0 1 0 0]
+ [0 1 0 1 0 1 0]
+ [0 0 1 0 0 0 0]
+ [0 1 0 0 0 1 0]
+ [0 0 1 0 1 0 1]
+ [0 0 0 0 0 1 0]]
+
+Predicted Adjacency:
+[[0 1 0 0 0 0 0]
+ [1 0 1 0 1 0 0]
+ [0 1 0 1 0 0 0]
+ [0 0 1 0 0 1 0]
+ [0 1 0 0 0 1 0]
+ [0 0 0 1 1 0 1]
+ [0 0 0 0 0 1 0]]
+
+
+
+ # good graphs
+
+ --- Example 1 (Graph ID: 521) ---
+Ground Truth Adjacency (Undirected):
+[[0 1 0 0 0 1 1]
+ [1 0 1 0 0 0 1]
+ [0 1 0 0 0 0 0]
+ [0 0 0 0 1 1 1]
+ [0 0 0 1 0 0 0]
+ [1 0 0 1 0 0 0]
+ [1 1 0 1 0 0 0]]
+
+Predicted Adjacency:
+[[0 0 0 1 0 0 1]
+ [0 0 1 0 0 0 1]
+ [0 1 0 0 0 0 0]
+ [1 0 0 0 1 1 1]
+ [0 0 0 1 0 0 0]
+ [0 0 0 1 0 0 0]
+ [1 1 0 1 0 0 0]]
+--------------------
+
+--- Example 2 (Graph ID: 737) ---
+Ground Truth Adjacency (Undirected):
+[[0 0 1 1 0 0 0]
+ [0 0 0 0 0 0 0]
+ [1 0 0 1 0 0 0]
+ [1 0 1 0 0 1 0]
+ [0 0 0 0 0 0 0]
+ [0 0 0 1 0 0 0]
+ [0 0 0 0 0 0 0]]
+
+Predicted Adjacency:
+[[0 0 1 1 0 0 0]
+ [0 0 0 0 0 0 0]
+ [1 0 0 1 0 1 0]
+ [1 0 1 0 0 0 0]
+ [0 0 0 0 0 0 0]
+ [0 0 1 0 0 0 0]
+ [0 0 0 0 0 0 0]]
+--------------------
+
+--- Example 3 (Graph ID: 740) ---
+Ground Truth Adjacency (Undirected):
+[[0 1 0 0 0 0 0]
+ [1 0 1 0 1 0 0]
+ [0 1 0 1 0 1 0]
+ [0 0 1 0 0 0 0]
+ [0 1 0 0 0 1 0]
+ [0 0 1 0 1 0 1]
+ [0 0 0 0 0 1 0]]
+
+Predicted Adjacency:
+[[0 1 0 0 0 0 0]
+ [1 0 1 0 1 0 0]
+ [0 1 0 1 0 0 0]
+ [0 0 1 0 0 1 0]
+ [0 1 0 0 0 1 0]
+ [0 0 0 1 1 0 1]
+ [0 0 0 0 0 1 0]]
+--------------------
