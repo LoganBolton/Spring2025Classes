@@ -25,20 +25,29 @@ def count_differences(seq1, seq2):
     
     return distance
 
-filename = 'msa.pir'
-aligned_sequences = parse_pir_file(filename)
+def calculate_distance(aligned_sequences):
+    num_sequences = len(aligned_sequences)
+    distances = [[0 for _ in range(num_sequences)] for _ in range(num_sequences)]
 
-num_sequences = len(aligned_sequences)
-distances = [[0 for _ in range(num_sequences)] for _ in range(num_sequences)]
 
-for i in range(num_sequences):
-    for j in range(num_sequences):
-        if i == j:
-            continue
-        seq1 = aligned_sequences[i]
-        seq2 = aligned_sequences[j]
+    for i in range(num_sequences):
+        for j in range(num_sequences):
+            if i == j:
+                continue
+            seq1 = aligned_sequences[i]
+            seq2 = aligned_sequences[j]
 
-        distances[i][j] = count_differences(seq1, seq2)
+            distances[i][j] = count_differences(seq1, seq2)
+    
+    return distances
+    
 
-for row in distances:
-    print(row)
+def main():
+    filename = 'msa.pir'
+    aligned_sequences = parse_pir_file(filename)
+    distances = calculate_distance(aligned_sequences)
+
+    
+        
+if __name__ == "__main__":
+    main()
