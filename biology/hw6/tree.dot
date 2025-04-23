@@ -1,0 +1,12 @@
+graph UPGMA {
+    "node6" -- "seq1" [weight=63.50, label="63.50"];
+    "node6" -- "seq0" [weight=63.50, label="63.50"];
+    "node7" -- "seq5" [weight=78.50, label="78.50"];
+    "node7" -- "seq4" [weight=78.50, label="78.50"];
+    "node8" -- "node7" [weight=106.25, label="106.25"];
+    "node8" -- "seq3" [weight=106.25, label="106.25"];
+    "node9" -- "node6" [weight=117.75, label="117.75"];
+    "node9" -- "seq2" [weight=117.75, label="117.75"];
+    "node10" -- "node9" [weight=171.59, label="171.59"];
+    "node10" -- "node8" [weight=171.59, label="171.59"];
+}
