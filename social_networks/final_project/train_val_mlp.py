@@ -29,14 +29,10 @@ OUTPUT_DIR_BASE = f'{RUN_PATH}/mlp_baseline_hpo_output'
 # --- NEW: Define Hyperparameter Sets to Try ---
 # Example sets: trying different learning rates and hidden channels
 hyperparameter_sets = [
-    {'lr': 0.003, 'hidden': 1024, 'batch_size': 8, 'dropout': 0.5},
-    {'lr': 0.002, 'hidden': 2048, 'batch_size': 16, 'dropout': 0.6},
-    {'lr': 0.002, 'hidden': 2048, 'batch_size': 16, 'dropout': 0.3},
-    {'lr': 0.001, 'hidden': 2048, 'batch_size': 8, 'dropout': 0.5},
-    {'lr': 0.002, 'hidden': 4096, 'batch_size': 8, 'dropout': 0.5},
-    {'lr': 0.001, 'hidden': 4096, 'batch_size': 8, 'dropout': 0.5},
-    {'lr': 0.001, 'hidden': 4096, 'batch_size': 16, 'dropout': 0.5},
-    {'lr': 0.001, 'hidden': 8192, 'batch_size': 8, 'dropout': 0.5},
+    {'lr': 0.001, 'hidden': 4096, 'batch_size': 128, 'dropout': 0.5},
+    {'lr': 0.0015, 'hidden': 4096, 'batch_size': 128, 'dropout': 0.5},
+    {'lr': 0.002, 'hidden': 4096, 'batch_size': 128, 'dropout': 0.5},
+    {'lr': 0.002, 'hidden': 4096, 'batch_size': 128, 'dropout': 0.65},
     # Add more combinations as needed
 ]
 
@@ -156,8 +152,9 @@ def load_data_mlp(metadata_path, data_dir):
             # Flatten the matrices for MLP input/output
             attn_flat = avg_attn_matrix.flatten() # Shape [N*N]
             # Ensure GT is undirected for target (like in GCN version)
-            adj_target_undirected = torch.clamp(gt_adjacency + gt_adjacency.t(), max=1)
-            adj_flat = adj_target_undirected.flatten() # Shape [N*N]
+            # adj_target_undirected = torch.clamp(gt_adjacency + gt_adjacency.t(), max=1)
+            # adj_flat = adj_target_undirected.flatten() # Shape [N*N]
+            adj_flat = gt_adjacency.flatten()
 
             graph_id = metadata['graph_id'] # Store graph ID
 

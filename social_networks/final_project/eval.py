@@ -639,6 +639,12 @@ if __name__ == "__main__":
             'num_communities_louvain', 'num_communities_lpa' # Added community counts
         ]
 
+        integer_metrics = {
+            'num_strongly_connected_components',
+            'num_weakly_connected_components',
+            'num_communities_louvain',
+            'num_communities_lpa'
+        }
         print("Generating GT vs Predicted distribution plots...")
         for base_metric in base_metrics_for_dist_plot:
             gt_col = f'gt_{base_metric}'
@@ -649,12 +655,48 @@ if __name__ == "__main__":
                 if gt_data.empty and pred_data.empty: continue
 
                 plt.figure(figsize=(10, 6))
-                if not gt_data.empty: sns.histplot(gt_data, color='skyblue', label='Ground Truth', kde=True, stat="density", linewidth=0, alpha=0.6)
-                if not pred_data.empty: sns.histplot(pred_data, color='lightcoral', label='Predicted', kde=True, stat="density", linewidth=0, alpha=0.6)
+                is_int_metric = base_metric in integer_metrics
+
+                if not gt_data.empty:
+                    if is_int_metric:
+                        bins = np.arange(gt_data.min()-0.5,
+                                        gt_data.max()+1.5, 1)   # *** integer‑aligned bins
+                        sns.histplot(gt_data,
+                                    bins=bins,
+                                    color='skyblue', label='Ground Truth',
+                                    discrete=True,       # *** new
+                                    stat="count",        # *** raw counts
+                                    shrink=0.8)          # *** nicer bar spacing
+                    else:
+                        sns.histplot(gt_data,
+                                    color='skyblue', label='Ground Truth',
+                                    kde=True,  stat="count",
+                                    linewidth=0, alpha=0.6)
+
+                if not pred_data.empty:
+                    if is_int_metric:
+                        bins = np.arange(pred_data.min()-0.5,
+                                        pred_data.max()+1.5, 1)
+                        sns.histplot(pred_data,
+                                    bins=bins,
+                                    color='lightcoral', label='Predicted',
+                                    discrete=True,
+                                    stat="count",
+                                    shrink=0.8)
+                    else:
+                        sns.histplot(pred_data,
+                                    color='lightcoral', label='Predicted',
+                                    kde=True,  stat="count",
+                                    linewidth=0, alpha=0.6)
+
+                # Show only integer ticks for discrete metrics
+                if is_int_metric:
+                    plt.xticks(range(int(min(gt_data.min(), pred_data.min())),
+                                    int(max(gt_data.max(), pred_data.max()))+1))
                 title_metric = base_metric.replace("_", " ").title()
                 plt.title(f'Distribution Comparison: {title_metric}')
                 plt.xlabel(f'{title_metric} Value')
-                plt.ylabel('Density')
+                plt.ylabel('Count')
                 plt.legend()
                 plt.tight_layout()
                 plt.savefig(os.path.join(plot_dir, f'{base_metric}_distribution_comparison.png'))

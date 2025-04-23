@@ -155,9 +155,9 @@ def load_data_mlp(metadata_path, data_dir):
 
             # Flatten the matrices for MLP input/output
             attn_flat = avg_attn_matrix.flatten() # Shape [N*N]
-            # Ensure GT is undirected for target (like in GCN version)
-            adj_target_undirected = torch.clamp(gt_adjacency + gt_adjacency.t(), max=1)
-            adj_flat = adj_target_undirected.flatten() # Shape [N*N]
+            # adj_target_undirected = torch.clamp(gt_adjacency + gt_adjacency.t(), max=1)
+            # adj_flat = adj_target_undirected.flatten() # Shape [N*N]
+            adj_flat = gt_adjacency.flatten()
 
             graph_id = metadata['graph_id'] # Store graph ID
 
@@ -427,7 +427,7 @@ if __name__ == "__main__":
                             gt_matrix = gt_matrix_flat.view(N, N).cpu().numpy().astype(int)
                             pred_matrix = pred_matrix_flat.view(N, N).cpu().numpy()
 
-                            print("Ground Truth Adjacency (Undirected):")
+                            print("Ground Truth Adjacency (Directed):")
                             print(gt_matrix)
                             print("\nPredicted Adjacency:")
                             print(pred_matrix)

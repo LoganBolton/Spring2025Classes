@@ -11,7 +11,7 @@ Other Arxiv papers have shown that you can train a transformer to reverse engine
 
 ## Summary
 - Feed in a directed graph to an LLM in a simple text format. 
-- Train a GCN on attention values and have it generate a new directed graph 
+- Train a MLP on attention values and have it generate a new directed graph 
 - Compare the generated graph to the original graph using a variety of social network analysis tools
 
 ## Setup
@@ -26,7 +26,7 @@ Other Arxiv papers have shown that you can train a transformer to reverse engine
 
 ### Training
 - Split up all datasets into a test train split
-- Train GCN model to predict original adjacency matrix based off averaged attention matrix
+- Train MLP model to predict original adjacency matrix based off averaged attention matrix
 
 ### Evaluation
 - Compare generate graph to original graph

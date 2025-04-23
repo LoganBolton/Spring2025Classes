@@ -1,11 +1,11 @@
 ---
-title: "Project 5"
+title: "Project 6"
 output: pdf_document
 author: "Logan Bolton"
 date: "2025-03-30"
 ---
 
-_Acknowledgement:_ This code was created through the repurposing of code found in the lecture notes and through collaboration with Gemini 2.5 Pro. AI tools were very helpful for me while fixing errors and determining the correct syntax to plot graphs.
+_Acknowledgement:_ This code was created through the repurposing of code found in the lecture notes and through collaboration with Gemini 2.5 Pro.
 
 ```{r setup}
 library('igraph')
