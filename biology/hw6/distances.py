@@ -4,7 +4,6 @@ from pathlib import Path
 
 
 def parse_pir_file(filename: str):
-    """Return a list of aligned sequences (strings) from a PIR file."""
     sequences = []
     current = []
     with open(filename, "r") as fh:
@@ -48,11 +47,11 @@ class Cluster:
 
     def __init__(self, id_, name, size, height=0.0, left=None, right=None):
         self.id = id_
-        self.name = name          # label used in DOT
-        self.size = size          # number of leaf members
-        self.height = height      # distance from this node to its leaves
-        self.left = left          # child Cluster or None
-        self.right = right        # child Cluster or None
+        self.name = name
+        self.size = size
+        self.height = height
+        self.left = left
+        self.right = right
 
 
 def upgma(dist_mat, leaf_names):
@@ -63,7 +62,6 @@ def upgma(dist_mat, leaf_names):
 
     next_id = n
     edges = []
-    # store all pair‐wise distances seen
     dists = {(i, j): dist_mat[i][j] for i in range(n) for j in range(i)}
 
     while len(clusters) > 1:
@@ -79,11 +77,9 @@ def upgma(dist_mat, leaf_names):
                          height=new_h, left=ci, right=cj)
         clusters[next_id] = parent
 
-        # record branches
         edges.append((parent.name, ci.name, new_h - ci.height))
         edges.append((parent.name, cj.name, new_h - cj.height))
 
-        # update distances to the new cluster
         for k, ck in clusters.items():
             if k == next_id:
                 continue
@@ -100,24 +96,18 @@ def upgma(dist_mat, leaf_names):
 
 
 def print_full_distance_matrix_from_edges(edges, leaf_names):
-    # 1) figure out internal nodes in numeric order
     internals = {
         parent for parent,_,_ in edges
         if parent not in leaf_names
     }
-    # sort by the number after "node"
     internals = sorted(internals, key=lambda x: int(x.replace("node","")))
-    
-    # 2) build full label list
     labels = leaf_names + internals
     
-    # 3) build adjacency list
     adj = {lbl: [] for lbl in labels}
     for p, c, w in edges:
         adj[p].append((c, w))
         adj[c].append((p, w))
     
-    # 4) for each label, do a DFS/BFS to accumulate path‐lengths
     full_dist = {lbl: {} for lbl in labels}
     for src in labels:
         dist = {src: 0.0}
@@ -130,7 +120,6 @@ def print_full_distance_matrix_from_edges(edges, leaf_names):
                     stack.append(v)
         full_dist[src] = dist
     
-    # 5) print a tab-delimited matrix
     print("\t" + "\t".join(labels))
     for i, src in enumerate(labels):
         row = [f"{full_dist[src][dst]:.2f}" for dst in labels]
@@ -139,7 +128,6 @@ def print_full_distance_matrix_from_edges(edges, leaf_names):
 
 
 def edges_to_dot(edges):
-    """edges: list of (parent_name, child_name, branch_len)"""
     lines = ["graph UPGMA {"]
     for parent, child, w in edges:
         lines.append(f'    "{parent}" -- "{child}" '
@@ -154,7 +142,7 @@ def main():
     seqs = parse_pir_file(pir_file)
     names = [f"seq{i}" for i in range(len(seqs))]
     mat = distance_matrix(seqs)
-    # print(mat)
+
     print("Original distance matrix:")
     for row in mat:
         print(row)
@@ -167,8 +155,6 @@ def main():
 
     with open("tree.dot", "w") as f:
         f.write(edges_to_dot(edge_list))
-    print("DOT file written to tree.dot")
-
 
 if __name__ == "__main__":
     main()
