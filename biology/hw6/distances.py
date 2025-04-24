@@ -1,80 +1,27 @@
 import heapq
 from collections import defaultdict
-
-class Cluster:
-    def __init__(self, name, members):
-        self.name = name
-        self.members = set(members)
-
-def upgma(dist_matrix, sequence_names):
-    n = len(sequence_names)
-    clusters = {i: Cluster(sequence_names[i], [sequence_names[i]]) for i in range(n)}
-    distances = {(i, j): dist_matrix[i][j] for i in range(n) for j in range(i) if i != j}
-    heap = [(dist, i, j) for (i, j), dist in distances.items()]
-    heapq.heapify(heap)
-
-    next_cluster_id = n
-    tree = defaultdict(list)
-
-    while len(clusters) > 1:
-        while True:
-            dist, i, j = heapq.heappop(heap)
-            if i in clusters and j in clusters:
-                break
-
-        new_name = f"node{next_cluster_id}"
-        new_members = clusters[i].members.union(clusters[j].members)
-        clusters[next_cluster_id] = Cluster(new_name, new_members)
-
-        tree[new_name].append((clusters[i].name, dist / 2))
-        tree[new_name].append((clusters[j].name, dist / 2))
-
-        del clusters[i]
-        del clusters[j]
-
-        for k in clusters:
-            if k == next_cluster_id:
-                continue
-            d1 = dist_matrix[i][k] if i < k else dist_matrix[k][i]
-            d2 = dist_matrix[j][k] if j < k else dist_matrix[k][j]
-            new_dist = (d1 + d2) / 2
-            dist_matrix.append([0]*len(dist_matrix))  # Expand for new row
-            for row in dist_matrix:
-                row.append(0)
-            dist_matrix[next_cluster_id][k] = new_dist
-            dist_matrix[k][next_cluster_id] = new_dist
-            heapq.heappush(heap, (new_dist, next_cluster_id, k))
-
-        next_cluster_id += 1
-
-    return tree
-
-def dot_format(tree):
-    dot = "graph UPGMA {\n"
-    for parent, children in tree.items():
-        for child, weight in children:
-            dot += f'    "{parent}" -- "{child}" [weight={weight:.2f}, label="{weight:.2f}"];\n'
-    dot += "}"
-    return dot
+from pathlib import Path
 
 
-def parse_pir_file(filename):
+def parse_pir_file(filename: str):
+    """Return a list of aligned sequences (strings) from a PIR file."""
     sequences = []
-    with open(filename, 'r') as file:
-        current_seq = ''
-        for line in file:
-            line = line.strip()
-            if line.startswith('>'):
-                if current_seq:
-                    sequences.append(current_seq)
-                    current_seq = ''
+    current = []
+    with open(filename, "r") as fh:
+        for line in fh:
+            line = line.rstrip()
+            if line.startswith(">"):
+                if current:
+                    sequences.append("".join(current))
+                    current.clear()
             else:
-                current_seq += line
-        if current_seq:
-            sequences.append(current_seq)
+                current.append(line)
+        if current:
+            sequences.append("".join(current))
     return sequences
 
-def count_differences(seq1, seq2):
+
+def hamming(seq1, seq2):
     if len(seq1) != len(seq2):
         raise Exception("Sequences aren't same length :(")
     
@@ -85,35 +32,143 @@ def count_differences(seq1, seq2):
     
     return distance
 
-def calculate_distance(aligned_sequences):
-    num_sequences = len(aligned_sequences)
-    distances = [[0 for _ in range(num_sequences)] for _ in range(num_sequences)]
+
+def distance_matrix(seqs):
+    n = len(seqs)
+    mat = [[0] * n for _ in range(n)]
+    for i in range(n):
+        for j in range(i):
+            d = hamming(seqs[i], seqs[j])
+            mat[i][j] = mat[j][i] = d
+    return mat
 
 
-    for i in range(num_sequences):
-        for j in range(num_sequences):
-            if i == j:
+class Cluster:
+    __slots__ = ("id", "name", "size", "height", "left", "right")
+
+    def __init__(self, id_, name, size, height=0.0, left=None, right=None):
+        self.id = id_
+        self.name = name          # label used in DOT
+        self.size = size          # number of leaf members
+        self.height = height      # distance from this node to its leaves
+        self.left = left          # child Cluster or None
+        self.right = right        # child Cluster or None
+
+
+def upgma(dist_mat, leaf_names):
+    n = len(leaf_names)
+    clusters = {i: Cluster(i, leaf_names[i], 1) for i in range(n)}
+    pq = [(dist_mat[i][j], i, j) for i in range(n) for j in range(i)]
+    heapq.heapify(pq)
+
+    next_id = n
+    edges = []
+    # store all pair‐wise distances seen
+    dists = {(i, j): dist_mat[i][j] for i in range(n) for j in range(i)}
+
+    while len(clusters) > 1:
+        # find closest alive pair
+        while True:
+            dist, i, j = heapq.heappop(pq)
+            if i in clusters and j in clusters:
+                break
+
+        ci, cj = clusters.pop(i), clusters.pop(j)
+        new_h = dist / 2.0
+        parent = Cluster(next_id, f"node{next_id}", ci.size + cj.size,
+                         height=new_h, left=ci, right=cj)
+        clusters[next_id] = parent
+
+        # record branches
+        edges.append((parent.name, ci.name, new_h - ci.height))
+        edges.append((parent.name, cj.name, new_h - cj.height))
+
+        # update distances to the new cluster
+        for k, ck in clusters.items():
+            if k == next_id:
                 continue
-            seq1 = aligned_sequences[i]
-            seq2 = aligned_sequences[j]
+            dik = dists[(max(i, k), min(i, k))]
+            djk = dists[(max(j, k), min(j, k))]
+            new_dist = (dik * ci.size + djk * cj.size) / (ci.size + cj.size)
+            dists[(max(next_id, k), min(next_id, k))] = new_dist
+            heapq.heappush(pq, (new_dist, min(next_id, k), max(next_id, k)))
 
-            distances[i][j] = count_differences(seq1, seq2)
+        next_id += 1
+
+    root = next(iter(clusters.values()))
+    return edges
+
+
+def print_full_distance_matrix_from_edges(edges, leaf_names):
+    # 1) figure out internal nodes in numeric order
+    internals = {
+        parent for parent,_,_ in edges
+        if parent not in leaf_names
+    }
+    # sort by the number after "node"
+    internals = sorted(internals, key=lambda x: int(x.replace("node","")))
     
-    return distances
+    # 2) build full label list
+    labels = leaf_names + internals
     
+    # 3) build adjacency list
+    adj = {lbl: [] for lbl in labels}
+    for p, c, w in edges:
+        adj[p].append((c, w))
+        adj[c].append((p, w))
+    
+    # 4) for each label, do a DFS/BFS to accumulate path‐lengths
+    full_dist = {lbl: {} for lbl in labels}
+    for src in labels:
+        dist = {src: 0.0}
+        stack = [src]
+        while stack:
+            u = stack.pop()
+            for v, w in adj[u]:
+                if v not in dist:
+                    dist[v] = dist[u] + w
+                    stack.append(v)
+        full_dist[src] = dist
+    
+    # 5) print a tab-delimited matrix
+    print("\t" + "\t".join(labels))
+    for i, src in enumerate(labels):
+        row = [f"{full_dist[src][dst]:.2f}" for dst in labels]
+        print(f"{src}\t" + "\t".join(row))
+
+
+
+def edges_to_dot(edges):
+    """edges: list of (parent_name, child_name, branch_len)"""
+    lines = ["graph UPGMA {"]
+    for parent, child, w in edges:
+        lines.append(f'    "{parent}" -- "{child}" '
+                     f'[weight={w:.5f}, label="{w:.2f}"];')
+    lines.append("}")
+    return "\n".join(lines)
+
 
 def main():
-    filename = 'msa.pir'
-    aligned_sequences = parse_pir_file(filename)
-    sequence_names = [f"seq{i}" for i in range(len(aligned_sequences))]
+    pir_file = "msa.pir"
 
-    distances = calculate_distance(aligned_sequences)
-    
+    seqs = parse_pir_file(pir_file)
+    names = [f"seq{i}" for i in range(len(seqs))]
+    mat = distance_matrix(seqs)
+    # print(mat)
+    print("Original distance matrix:")
+    for row in mat:
+        print(row)
+        
+    edge_list = upgma(mat, names)
 
-    tree = upgma(distances, sequence_names)
-    dot = dot_format(tree)
+    print("\nFull UPGMA distance matrix (including internal nodes):")
+    print_full_distance_matrix_from_edges(edge_list, names)
+
 
     with open("tree.dot", "w") as f:
-        f.write(dot)
+        f.write(edges_to_dot(edge_list))
+    print("DOT file written to tree.dot")
+
+
 if __name__ == "__main__":
     main()
