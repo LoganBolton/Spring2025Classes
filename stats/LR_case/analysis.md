@@ -158,17 +158,23 @@ print(f"\nFitted Model: Ozone_pred = {intercept_slr:.3f} + ({slope_wind_slr:.3f}
     Fitted Model: Ozone_pred = 96.873 + (-5.551) * Wind
 
 
+This equation shows that as wind speed increases, the amount of ozone concentration decreases. When wind speed is zero, the ozone concentration is 96.873. The very low p values for these values indicates that these are stastistitically significant relationships.
+
+However, the low R^2 value of 0.362 indicates that this is not a very strong model. This suggests that windspeed is not enough to predict ozone concentration.
+
 c. Predict the ozone concentration when wind = 10 mph.
 
 
 ```python
 wind_value = 10
 predicted_ozone_slr = slr_model.predict(pd.DataFrame({'Wind': [wind_value]}))
-print(f"Predicted Ozone at Wind = {wind_value} mph: {predicted_ozone_slr.iloc[0]:.3f} ppb")
+prediction = f'{predicted_ozone_slr.iloc[0]:.3f}'
+
+print(f"Predicted Ozone at Wind = {wind_value} mph: {prediction}")
 
 ```
 
-    Predicted Ozone at Wind = 10 mph: 41.364 ppb
+    Predicted Ozone at Wind = 10 mph: 41.364
 
 
 d. Check model assumptions using diagnostic plots.
@@ -197,9 +203,13 @@ plt.show()
 
 
     
-![png](analysis_files/analysis_16_0.png)
+![png](analysis_files/analysis_17_0.png)
     
 
+
+The diagnostic plots confirm my interpretation that wind speed alone is insufficient to predict ozone concentration. The residuals plot displays considerable scatter patterns, which supports the model's low R^2 value of 0.362.
+
+Additionally, the Q-Q plot shows deviations from the reference line, supporting my interpretation that more factors are needed for the model.
 
 ### Multiple Linear regression: include wind speed, temperature and solar radiation to improve predictions
 a. Multicollinearity check using pairwise correlation plot.
