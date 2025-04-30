@@ -27,9 +27,9 @@ print(observed_mean)
 
 ```python
 observed_mean = df['sepal length (cm)'].mean()
-num_simulations = 10000
+num_simulations = 1_000_000_000
 n = len(df)
-sample_std = np.std(df.values, ddof=1)
+sample_std = df['sepal length (cm)'].std(ddof=1)
 print(sample_std)
 
 CLAIMED_MEAN = 5.5
@@ -38,25 +38,28 @@ simulated_means = np.random.normal(loc=CLAIMED_MEAN, scale=sample_std/np.sqrt(n)
 
 ```
 
-    1.8830328437823523
+    0.5161711470638635
 
 
 
 ```python
-extreme_count = np.sum(np.abs(simulated_means - 5.5) >= np.abs(observed_mean - 5.5))
+observed_diff = np.abs(observed_mean - CLAIMED_MEAN)
+
+extreme_count = np.sum(np.abs(simulated_means - CLAIMED_MEAN) >= observed_diff)
+
 p_value = extreme_count / num_simulations
 print(f"p-value: {p_value}")
 ```
 
-    p-value: 0.1049
+    p-value: 2e-09
 
 
 
 ```python
 plt.hist(simulated_means, bins=40, alpha=0.7, edgecolor='black')
 plt.axvline(observed_mean, color='red', linestyle='--', label=f'Observed mean = {observed_mean:.2f}')
-plt.title("Simulated Distribution of Sepal Length Means (H₀: μ = 5.5)")
-plt.xlabel("Sample Mean")
+plt.title("Simulated Distribution of Lengths")
+plt.xlabel("Mean")
 plt.ylabel("Frequency")
 plt.legend()
 plt.show()
@@ -67,6 +70,12 @@ plt.show()
 ![png](analysis_files/analysis_5_0.png)
     
 
+
+# Intepretation and Results
+
+The actual observed mean of the data was 5.94 with a standard deviation of 1.88.
+
+In order to test the assumption that the true mean was 5.5, I ran 10,000,000 simulations. This resulted in a p-value of about 2e-9 Since this is dramatically less than 0.05, we **reject the null hypothesis** that the true mean is 5.5.
 
 # Problem 2
 
